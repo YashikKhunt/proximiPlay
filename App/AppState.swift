@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import MultipeerConnectivity
 
 /// The top-level application state, injected into the environment at app startup.
 ///
@@ -14,6 +15,11 @@ final class AppState {
     let gameSessionManager = GameSessionManager()
     let connectionMonitor = ConnectionMonitor()
     let gameEngine: GameEngine
+    /// The Speed Draw stroke-rendering buffer, fed directly by
+    /// `.drawStroke` messages below — deliberately bypassing `GameEngine`,
+    /// which treats strokes as a no-op (see `GameEngine.submitInput`). See
+    /// `StrokeSync`'s doc comment for the full wire convention.
+    let strokeSync = StrokeSync()
     var currentGameState: GameState = .idle
     var isPremiumUnlocked: Bool = false
 
@@ -30,6 +36,7 @@ final class AppState {
         // device).
         let monitor = connectionMonitor
         let sessionManager = gameSessionManager
+        let strokeSync = strokeSync
         gameSessionManager.onMessageReceived = { [weak sessionManager] message, peerID in
             guard let sessionManager else { return }
             switch message {
@@ -37,7 +44,21 @@ final class AppState {
                 monitor.recordHeartbeat(from: peerID)
 
             case .playerInput(let playerId, let input):
-                if sessionManager.isHost {
+                if case .drawStroke(let points) = input {
+                    // Peer-to-peer rendering data, not scored input — never
+                    // routed through the engine (see `GameEngine.submitInput`
+                    // and `StrokeSync`'s doc comment). The host also relays
+                    // to every other connected peer, since this app's
+                    // Multipeer session is star-shaped: a joiner-drawer can
+                    // only reach the host directly, not its fellow joiners.
+                    strokeSync.receive(points: points)
+                    if sessionManager.isHost {
+                        let relayTargets = sessionManager.connectedPeers.filter { $0 != peerID }
+                        if !relayTargets.isEmpty {
+                            sessionManager.send(message, to: relayTargets, mode: .unreliable)
+                        }
+                    }
+                } else if sessionManager.isHost {
                     engine.submitInput(playerId: playerId, input: input)
                 }
 

@@ -46,6 +46,10 @@
 		54D8F06C52974995B32DD276 /* TriviaRoundResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */; };
 		CA37B12EE52015CFCEDDF459 /* VoteGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31724A54B4210942D56EEE8 /* VoteGameView.swift */; };
 		2DFA92476D8002D78A38A748 /* VoteRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */; };
+		7145E38DAB2741E9A0D23430 /* StrokeSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D61D4697375430B81F4993C /* StrokeSync.swift */; };
+		1FEDB35824B747AC85B290AC /* DrawingCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */; };
+		B034595888584DBBA8092386 /* DrawGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */; };
+		5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359B8E67520F47C9B88480CE /* GuessInputView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +76,10 @@
 		78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaRoundResultView.swift; sourceTree = "<group>"; };
 		F31724A54B4210942D56EEE8 /* VoteGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteGameView.swift; sourceTree = "<group>"; };
 		4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteRevealView.swift; sourceTree = "<group>"; };
+		8D61D4697375430B81F4993C /* StrokeSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeSync.swift; sourceTree = "<group>"; };
+		D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingCanvasView.swift; sourceTree = "<group>"; };
+		84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawGameView.swift; sourceTree = "<group>"; };
+		359B8E67520F47C9B88480CE /* GuessInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessInputView.swift; sourceTree = "<group>"; };
 		4743515830496C22001644A3 /* proximiPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = proximiPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4743515B30496C22001644A3 /* proximiPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = proximiPlayApp.swift; sourceTree = "<group>"; };
 		4743515D30496C22001644A3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -266,6 +274,10 @@
 		4743518D30496E55001644A3 /* SpeedDraw */ = {
 			isa = PBXGroup;
 			children = (
+				84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */,
+				D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */,
+				359B8E67520F47C9B88480CE /* GuessInputView.swift */,
+				8D61D4697375430B81F4993C /* StrokeSync.swift */,
 			);
 			path = SpeedDraw;
 			sourceTree = "<group>";
@@ -560,6 +572,10 @@
 				6E1182C36D114409B4CABAD9 /* DrawWords.swift in Sources */,
 				CA37B12EE52015CFCEDDF459 /* VoteGameView.swift in Sources */,
 				2DFA92476D8002D78A38A748 /* VoteRevealView.swift in Sources */,
+				7145E38DAB2741E9A0D23430 /* StrokeSync.swift in Sources */,
+				1FEDB35824B747AC85B290AC /* DrawingCanvasView.swift in Sources */,
+				B034595888584DBBA8092386 /* DrawGameView.swift in Sources */,
+				5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
