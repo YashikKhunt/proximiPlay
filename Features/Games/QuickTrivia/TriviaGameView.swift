@@ -96,12 +96,16 @@ struct TriviaGameView: View {
             }
         }
         .hostLeftAlert()
+        .leaveGameGuard()
         .onChange(of: currentTriviaPayload, initial: true) { _, newPayload in
             handleNewRound(newPayload)
         }
         .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
             guard newRoundNumber != nil else { return }
             presentReveal()
+        }
+        .onDisappear {
+            revealAutoAdvanceTask?.cancel()
         }
     }
 
@@ -153,7 +157,7 @@ struct TriviaGameView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(Array(round.options.enumerated()), id: \.offset) { index, option in
                     TriviaAnswerButton(
-                        letter: Self.letters[index],
+                        letter: Self.letter(for: index),
                         text: option,
                         state: buttonState(for: index, in: round)
                     ) {
@@ -258,23 +262,14 @@ struct TriviaGameView: View {
     }
 
     private static let letters = ["A", "B", "C", "D"]
-}
 
-// MARK: - Round Header
-
-private struct RoundHeaderView: View {
-    let roundNumber: Int
-    let totalRounds: Int
-
-    var body: some View {
-        HStack {
-            Text("Round \(roundNumber) of \(totalRounds)")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.secondary)
-            Spacer()
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Round \(roundNumber) of \(totalRounds)")
+    /// Bounds-safe: `RoundData.trivia`'s option count is never validated
+    /// against `letters.count` before reaching this view (a malformed or
+    /// future round payload could carry 5+ options), so this falls back to
+    /// a neutral glyph rather than crashing on an out-of-range subscript.
+    private static func letter(for index: Int) -> String {
+        guard letters.indices.contains(index) else { return "•" }
+        return letters[index]
     }
 }
 

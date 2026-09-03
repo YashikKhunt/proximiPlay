@@ -100,12 +100,16 @@ struct DrawGameView: View {
             }
         }
         .hostLeftAlert()
+        .leaveGameGuard()
         .onChange(of: currentDrawPayload, initial: true) { _, newPayload in
             handleNewRound(newPayload)
         }
         .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
             guard newRoundNumber != nil else { return }
             presentReveal()
+        }
+        .onDisappear {
+            revealAutoAdvanceTask?.cancel()
         }
     }
 
@@ -134,28 +138,50 @@ struct DrawGameView: View {
 
     // MARK: - Playing
 
+    /// The drawer's branch has no text input, so keyboard avoidance never
+    /// comes into play there — it stays a single `VStack`. The guesser's
+    /// branch does, though: `GuessInputView`'s `TextField` pulls the
+    /// keyboard up, and if the guess bar sits inside the same `VStack` as
+    /// the canvas, SwiftUI's keyboard avoidance shoves the *whole* stack
+    /// upward, pushing the drawing off the top of the screen right when a
+    /// guesser most needs to see it while typing. Floating the guess bar in
+    /// `.safeAreaInset(edge: .bottom)` on the outer container instead keeps
+    /// it out of that keyboard-shifted content: the canvas area above it
+    /// resizes to make room for both the inset and the keyboard, so both
+    /// stay visible and readable at once.
+    @ViewBuilder
     private func playingView(_ round: RoundSnapshot) -> some View {
         let isDrawer = round.drawerId == myPlayerId
 
-        return VStack(spacing: 16) {
-            RoundHeaderView(roundNumber: round.roundIndex, totalRounds: totalRounds)
-
-            if isDrawer {
+        if isDrawer {
+            VStack(spacing: 16) {
+                RoundHeaderView(roundNumber: round.roundIndex, totalRounds: totalRounds)
                 drawerBanner(word: round.word)
                 DrawingCanvasView(isEditable: true, onStrokeBatch: sendStrokeBatch)
-            } else {
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+        } else {
+            VStack(spacing: 16) {
+                RoundHeaderView(roundNumber: round.roundIndex, totalRounds: totalRounds)
                 DrawingCanvasView(
                     isEditable: false,
-                    segments: appState.strokeSync.segments.map(\.points)
+                    segments: appState.strokeSync.segments
                 )
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .safeAreaInset(edge: .bottom) {
                 GuessInputView(onSubmit: submitGuess)
                     .id(round.roundIndex)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    .padding(.bottom, 12)
+                    .background(.bar)
             }
-
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
     }
 
     private func drawerBanner(word: String) -> some View {
@@ -251,24 +277,6 @@ struct DrawGameView: View {
         let result: RoundResult
         let baselineScores: [UUID: Int]
         let isFinal: Bool
-    }
-}
-
-// MARK: - Round Header
-
-private struct RoundHeaderView: View {
-    let roundNumber: Int
-    let totalRounds: Int
-
-    var body: some View {
-        HStack {
-            Text("Round \(roundNumber) of \(totalRounds)")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.secondary)
-            Spacer()
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Round \(roundNumber) of \(totalRounds)")
     }
 }
 

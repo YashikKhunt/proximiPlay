@@ -131,12 +131,16 @@ struct ReflexGameView: View {
             }
         }
         .hostLeftAlert()
+        .leaveGameGuard()
         .onChange(of: isRoundActive, initial: true) { _, isActive in
             handleNewRound(isActive)
         }
         .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
             guard newRoundNumber != nil else { return }
             presentReveal()
+        }
+        .onDisappear {
+            revealAutoAdvanceTask?.cancel()
         }
     }
 
@@ -362,7 +366,7 @@ private struct ReflexPromptView: View {
                 HStack {
                     Text("Round \(roundNumber) of \(totalRounds)")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(foregroundColor.opacity(0.85))
+                        .foregroundStyle(foregroundColor.opacity(secondaryTextOpacity))
                     Spacer()
                 }
 
@@ -381,7 +385,7 @@ private struct ReflexPromptView: View {
                         .multilineTextAlignment(.center)
                     Text(subtitle)
                         .font(.headline)
-                        .foregroundStyle(foregroundColor.opacity(0.85))
+                        .foregroundStyle(foregroundColor.opacity(secondaryTextOpacity))
                         .multilineTextAlignment(.center)
                 }
 
@@ -391,7 +395,7 @@ private struct ReflexPromptView: View {
                             .tint(foregroundColor)
                         Text("Waiting for others…")
                             .font(.subheadline)
-                            .foregroundStyle(foregroundColor.opacity(0.85))
+                            .foregroundStyle(foregroundColor.opacity(secondaryTextOpacity))
                     }
                 }
 
@@ -417,16 +421,47 @@ private struct ReflexPromptView: View {
 
     private var isTappable: Bool { phase == .waiting || phase == .flash }
 
+    /// Custom, deliberately darker/deeper fills rather than plain
+    /// `Color.green`/`Color.red` — the system colors don't leave enough
+    /// contrast headroom for legible text on top of them (see
+    /// `foregroundColor` and this type's contrast targets below).
     private var backgroundColor: Color {
         switch phase {
         case .waiting:  .black
-        case .flash:    .green
-        case .tooSoon:  .red
-        case .lockedIn: .green
+        case .flash:    .flashGreen
+        case .tooSoon:  .tooSoonRed
+        case .lockedIn: .flashGreen
         }
     }
 
-    private var foregroundColor: Color { .white }
+    /// Paired with `backgroundColor` to clear WCAG's 4.5:1 body-text /
+    /// 3:1 large-text contrast floors on every phase, not just `.waiting`'s
+    /// white-on-black:
+    /// - `.flashGreen` (a vivid but *dark-enough* green,
+    ///   `Color(red: 0.20, green: 0.78, blue: 0.35)`) paired with **black**
+    ///   text measures ~9.45:1.
+    /// - `.tooSoonRed` (a deep red, `Color(red: 0.55, green: 0, blue: 0)`)
+    ///   paired with **white** text measures ~9.91:1.
+    /// - `.waiting`'s plain black paired with white text is ~21:1.
+    /// All three comfortably clear both the 4.5:1 body-text and 3:1
+    /// large-text targets — previously, white text at ~2.2:1 over
+    /// `Color.green`/`Color.red` fell well under even the lower bar.
+    private var foregroundColor: Color {
+        switch phase {
+        case .waiting:          .white
+        case .flash, .lockedIn: .black
+        case .tooSoon:          .white
+        }
+    }
+
+    /// Subtitle/secondary text keeps its `0.85` opacity reduction only on
+    /// `.waiting`'s white-on-black (still ~17.9:1 even reduced, nowhere
+    /// near the contrast floor). The flash/lockedIn/tooSoon states drop the
+    /// reduction entirely so the already-tighter (if still compliant)
+    /// contrast on those fills isn't eaten further by translucency.
+    private var secondaryTextOpacity: Double {
+        phase == .waiting ? 0.85 : 1.0
+    }
 
     private var symbolName: String {
         switch phase {
@@ -456,6 +491,15 @@ private struct ReflexPromptView: View {
     }
 
     private var accessibilityLabel: String { "\(title). \(subtitle)." }
+}
+
+// MARK: - Contrast-Safe Fill Colors
+
+/// See `ReflexPromptView.foregroundColor`'s doc comment for the contrast
+/// math behind these two custom fills.
+private extension Color {
+    static let flashGreen = Color(red: 0.20, green: 0.78, blue: 0.35)
+    static let tooSoonRed = Color(red: 0.55, green: 0.0, blue: 0.0)
 }
 
 // MARK: - Round Result Reveal

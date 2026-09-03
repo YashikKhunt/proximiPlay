@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1FEDB35824B747AC85B290AC /* DrawingCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */; };
+		2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */; };
+		2DFA92476D8002D78A38A748 /* VoteRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */; };
+		2F259B499DBA10854D9C1010 /* LeaveGameGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 185BD9F05975EE07B96CA870 /* LeaveGameGuard.swift */; };
 		4743515C30496C22001644A3 /* proximiPlayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743515B30496C22001644A3 /* proximiPlayApp.swift */; };
 		4743515E30496C22001644A3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743515D30496C22001644A3 /* ContentView.swift */; };
 		474351CA3049733E001644A3 /* GameSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351C93049733E001644A3 /* GameSessionManager.swift */; };
@@ -23,7 +27,11 @@
 		474351FD3049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
 		4D3AC1A00E3939890994760F /* GameHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABAC638B58EA1F895F16A8A /* GameHostView.swift */; };
 		4F6EB5EFA19B0623E8F45BAD /* PlayerRoster.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7D9D9FD7382D9B8D6A48D9A /* PlayerRoster.swift */; };
+		54D8F06C52974995B32DD276 /* TriviaRoundResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */; };
+		5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359B8E67520F47C9B88480CE /* GuessInputView.swift */; };
+		6456B8C7ED367E9C70F0015C /* RoundHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0DEA13C7975C7E98D0E63C /* RoundHeaderView.swift */; };
 		6E1182C36D114409B4CABAD9 /* DrawWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2661225BD61D4218B970D3AA /* DrawWords.swift */; };
+		7145E38DAB2741E9A0D23430 /* StrokeSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D61D4697375430B81F4993C /* StrokeSync.swift */; };
 		AA00000100000001AABBCC01 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000001AABBCC01 /* Player.swift */; };
 		AA00000100000002AABBCC01 /* PlayerColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000002AABBCC01 /* PlayerColor.swift */; };
 		AA00000100000003AABBCC01 /* GameMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000003AABBCC01 /* GameMode.swift */; };
@@ -35,23 +43,17 @@
 		AA00000100000009AABBCC01 /* RoundResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000009AABBCC01 /* RoundResult.swift */; };
 		AA0000010000000AAABBCC01 /* PlayerScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000AAAABBCC01 /* PlayerScore.swift */; };
 		AA0000010000000BAABBCC01 /* CodablePoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000BBAABBCC01 /* CodablePoint.swift */; };
+		B034595888584DBBA8092386 /* DrawGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */; };
 		BB00000100000001AABBCC02 /* ContentPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000200000001AABBCC02 /* ContentPack.swift */; };
 		BB00000100000002AABBCC02 /* ContentPackLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000200000002AABBCC02 /* ContentPackLoader.swift */; };
 		BB00000100000003AABBCC02 /* general.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000003AABBCC02 /* general.json */; };
 		BB00000100000004AABBCC02 /* popculture.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000004AABBCC02 /* popculture.json */; };
 		BB00000100000005AABBCC02 /* mostlikely.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000005AABBCC02 /* mostlikely.json */; };
 		BB00000100000006AABBCC02 /* wouldyourather.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000006AABBCC02 /* wouldyourather.json */; };
-		D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36511A62C2A5483193C1F642 /* GameEngine.swift */; };
-		EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E514E52689042D9980EB75F /* TriviaGameView.swift */; };
-		54D8F06C52974995B32DD276 /* TriviaRoundResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */; };
 		CA37B12EE52015CFCEDDF459 /* VoteGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31724A54B4210942D56EEE8 /* VoteGameView.swift */; };
-		2DFA92476D8002D78A38A748 /* VoteRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */; };
-		7145E38DAB2741E9A0D23430 /* StrokeSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D61D4697375430B81F4993C /* StrokeSync.swift */; };
-		1FEDB35824B747AC85B290AC /* DrawingCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */; };
-		B034595888584DBBA8092386 /* DrawGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */; };
-		5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359B8E67520F47C9B88480CE /* GuessInputView.swift */; };
+		D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36511A62C2A5483193C1F642 /* GameEngine.swift */; };
 		EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183F02246B3748469E7AC70C /* ReflexGameView.swift */; };
-		2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */; };
+		EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E514E52689042D9980EB75F /* TriviaGameView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,18 +74,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		2661225BD61D4218B970D3AA /* DrawWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawWords.swift; sourceTree = "<group>"; };
-		36511A62C2A5483193C1F642 /* GameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameEngine.swift; sourceTree = "<group>"; };
+		0D0DEA13C7975C7E98D0E63C /* RoundHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundHeaderView.swift; sourceTree = "<group>"; };
 		0E514E52689042D9980EB75F /* TriviaGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaGameView.swift; sourceTree = "<group>"; };
-		78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaRoundResultView.swift; sourceTree = "<group>"; };
-		F31724A54B4210942D56EEE8 /* VoteGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteGameView.swift; sourceTree = "<group>"; };
-		4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteRevealView.swift; sourceTree = "<group>"; };
-		8D61D4697375430B81F4993C /* StrokeSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeSync.swift; sourceTree = "<group>"; };
-		D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingCanvasView.swift; sourceTree = "<group>"; };
-		84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawGameView.swift; sourceTree = "<group>"; };
-		359B8E67520F47C9B88480CE /* GuessInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessInputView.swift; sourceTree = "<group>"; };
 		183F02246B3748469E7AC70C /* ReflexGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflexGameView.swift; sourceTree = "<group>"; };
+		185BD9F05975EE07B96CA870 /* LeaveGameGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaveGameGuard.swift; sourceTree = "<group>"; };
 		1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
+		2661225BD61D4218B970D3AA /* DrawWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawWords.swift; sourceTree = "<group>"; };
+		359B8E67520F47C9B88480CE /* GuessInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessInputView.swift; sourceTree = "<group>"; };
+		36511A62C2A5483193C1F642 /* GameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameEngine.swift; sourceTree = "<group>"; };
+		4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteRevealView.swift; sourceTree = "<group>"; };
 		4743515830496C22001644A3 /* proximiPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = proximiPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4743515B30496C22001644A3 /* proximiPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = proximiPlayApp.swift; sourceTree = "<group>"; };
 		4743515D30496C22001644A3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -102,6 +101,9 @@
 		474351F63049768C001644A3 /* PlayerBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBadge.swift; sourceTree = "<group>"; };
 		474351F73049768C001644A3 /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimaryButton.swift; sourceTree = "<group>"; };
 		6ABAC638B58EA1F895F16A8A /* GameHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHostView.swift; sourceTree = "<group>"; };
+		78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaRoundResultView.swift; sourceTree = "<group>"; };
+		84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawGameView.swift; sourceTree = "<group>"; };
+		8D61D4697375430B81F4993C /* StrokeSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeSync.swift; sourceTree = "<group>"; };
 		AA00000200000001AABBCC01 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		AA00000200000002AABBCC01 /* PlayerColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerColor.swift; sourceTree = "<group>"; };
 		AA00000200000003AABBCC01 /* GameMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMode.swift; sourceTree = "<group>"; };
@@ -120,6 +122,8 @@
 		BB00000200000005AABBCC02 /* mostlikely.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = mostlikely.json; sourceTree = "<group>"; };
 		BB00000200000006AABBCC02 /* wouldyourather.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = wouldyourather.json; sourceTree = "<group>"; };
 		C7D9D9FD7382D9B8D6A48D9A /* PlayerRoster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerRoster.swift; sourceTree = "<group>"; };
+		D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingCanvasView.swift; sourceTree = "<group>"; };
+		F31724A54B4210942D56EEE8 /* VoteGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteGameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -357,6 +361,8 @@
 				474351F53049768C001644A3 /* ConnectionIndicator.swift */,
 				474351F63049768C001644A3 /* PlayerBadge.swift */,
 				474351F73049768C001644A3 /* PrimaryButton.swift */,
+				0D0DEA13C7975C7E98D0E63C /* RoundHeaderView.swift */,
+				185BD9F05975EE07B96CA870 /* LeaveGameGuard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -584,6 +590,8 @@
 				5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */,
 				EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */,
 				2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */,
+				6456B8C7ED367E9C70F0015C /* RoundHeaderView.swift in Sources */,
+				2F259B499DBA10854D9C1010 /* LeaveGameGuard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

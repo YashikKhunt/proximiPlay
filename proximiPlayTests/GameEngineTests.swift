@@ -45,7 +45,7 @@ private func makePlayers(_ count: Int) -> [Player] {
 private func roundStartData(_ messages: [GameMessage], round: Int) -> RoundData? {
     var seen = 0
     for message in messages {
-        if case .roundStart(let data) = message {
+        if case .roundStart(let data, _) = message {
             seen += 1
             if seen == round { return data }
         }
@@ -267,6 +267,182 @@ struct GameEngineDisconnectTests {
 
         #expect(engine.isRunning)
     }
+
+    @Test func disconnectedPlayerIsRemovedFromTheDrawerQueueAndNeverDrawsAgain() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(3)
+        // Force exactly 3 rounds regardless of the roster size, so the test
+        // isn't coupled to `GameConfig.defaultConfig`'s player-count-aware
+        // round count.
+        let config = GameConfig(roundCount: 3, timePerRound: 20)
+
+        engine.startGame(mode: .speedDraw, roster: players, config: config)
+
+        // Round 1's drawer is assigned by join order — players[0].
+        #expect(engine.currentDrawerId == players[0].id)
+
+        // Disconnect players[1], who is queued to draw next but never gets
+        // the chance — a dead round assigned to them would otherwise run
+        // the full round timeout with no possible correct guess.
+        engine.playerDisconnected(players[1].id)
+
+        guard case .draw(let word1, _)? = engine.currentRound else {
+            Issue.record("Missing round 1 draw payload")
+            return
+        }
+        // The only remaining non-drawer (players[2]) guesses correctly,
+        // finishing round 1 early and advancing to round 2.
+        engine.submitInput(playerId: players[2].id, input: .guess(text: word1))
+
+        #expect(engine.isRunning)
+        #expect(engine.currentDrawerId != players[1].id)
+        let round2Drawer = engine.currentDrawerId
+
+        guard case .draw(let word2, _)? = engine.currentRound else {
+            Issue.record("Missing round 2 draw payload")
+            return
+        }
+        // Whoever isn't drawing round 2 guesses correctly, advancing to
+        // round 3 — the drawer queue refill (`players.map(\.id)`) must
+        // still never reintroduce the disconnected player.
+        let round2Guesser = players.first { $0.id != round2Drawer }!
+        engine.submitInput(playerId: round2Guesser.id, input: .guess(text: word2))
+
+        #expect(engine.currentDrawerId != players[1].id)
+    }
+}
+
+// MARK: - Round Tagging (stale input rejection)
+
+@MainActor
+struct GameEngineRoundTaggingTests {
+
+    @Test func lateInputStampedWithAPreviousRoundIsIgnored() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(2)
+        let config = GameConfig(roundCount: 2, timePerRound: 20)
+
+        engine.startGame(mode: .quickTrivia, roster: players, config: config)
+        #expect(engine.roundNumber == 1)
+
+        guard case .trivia(_, _, let correctIndexRound1)? = roundStartData(sender.sentMessages, round: 1) else {
+            Issue.record("Missing round 1 data")
+            return
+        }
+
+        // Both players answer round 1, advancing the engine into round 2.
+        engine.submitInput(playerId: players[0].id, input: .triviaAnswer(index: correctIndexRound1, timestamp: Date()), round: 1)
+        engine.submitInput(playerId: players[1].id, input: .triviaAnswer(index: correctIndexRound1, timestamp: Date()), round: 1)
+        #expect(engine.roundNumber == 2)
+
+        guard case .trivia(_, _, let correctIndexRound2)? = roundStartData(sender.sentMessages, round: 2) else {
+            Issue.record("Missing round 2 data")
+            return
+        }
+
+        // A message that arrives late, still stamped with round 1, must be
+        // ignored rather than consuming player[0]'s first-wins slot for the
+        // round that's actually in progress now.
+        let wrongIndex = (correctIndexRound2 + 1) % 4
+        engine.submitInput(playerId: players[0].id, input: .triviaAnswer(index: wrongIndex, timestamp: Date()), round: 1)
+
+        // Player[0]'s real, correctly-stamped round 2 answer must still be
+        // accepted — proving the stale submission above didn't silently
+        // consume their first-wins slot for this round.
+        engine.submitInput(playerId: players[0].id, input: .triviaAnswer(index: correctIndexRound2, timestamp: Date()), round: 2)
+        engine.submitInput(playerId: players[1].id, input: .triviaAnswer(index: correctIndexRound2, timestamp: Date()), round: 2)
+
+        guard let result = roundResult(sender.sentMessages, round: 2) else {
+            Issue.record("Round 2 never finished")
+            return
+        }
+        let player0Score = result.scores.first { $0.playerId == players[0].id }?.score ?? 0
+        // Player[0] answered round 1 correctly (200) and round 2 correctly
+        // (also scores > 0); had the stale round-1-tagged wrong answer been
+        // misapplied to round 2, their round 2 contribution would be 0.
+        #expect(player0Score > 200)
+    }
+
+    @Test func hostLocalSubmissionWithNoRoundIsAlwaysTreatedAsCurrent() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(2)
+        let config = GameConfig(roundCount: 1, timePerRound: 20)
+
+        engine.startGame(mode: .quickTrivia, roster: players, config: config)
+        guard case .trivia(_, _, let correctIndex)? = roundStartData(sender.sentMessages, round: 1) else {
+            Issue.record("Missing round 1 data")
+            return
+        }
+
+        // No `round:` argument — the trusted host-local path used by
+        // `AppState.submitPlayerInput` for the host's own player.
+        engine.submitInput(playerId: players[0].id, input: .triviaAnswer(index: correctIndex, timestamp: Date()))
+        engine.submitInput(playerId: players[1].id, input: .triviaAnswer(index: correctIndex, timestamp: Date()))
+
+        #expect(finalScores(sender.sentMessages) != nil)
+    }
+}
+
+// MARK: - Round Data Validation
+
+@MainActor
+struct GameEngineRoundDataValidationTests {
+
+    @Test func wellFormedTriviaPayloadIsValid() {
+        let data = RoundData.trivia(question: "2+2?", options: ["1", "2", "3", "4"], correctIndex: 3)
+        #expect(GameEngine.isValidRoundData(data))
+    }
+
+    @Test func triviaPayloadWithWrongOptionCountIsInvalid() {
+        let data = RoundData.trivia(question: "2+2?", options: ["1", "2", "3", "4", "5"], correctIndex: 0)
+        #expect(!GameEngine.isValidRoundData(data))
+    }
+
+    @Test func triviaPayloadWithOutOfRangeCorrectIndexIsInvalid() {
+        let data = RoundData.trivia(question: "2+2?", options: ["1", "2", "3", "4"], correctIndex: 9)
+        #expect(!GameEngine.isValidRoundData(data))
+        let negative = RoundData.trivia(question: "2+2?", options: ["1", "2", "3", "4"], correctIndex: -1)
+        #expect(!GameEngine.isValidRoundData(negative))
+    }
+
+    @Test func triviaPayloadWithEmptyQuestionOrOptionIsInvalid() {
+        let emptyQuestion = RoundData.trivia(question: "   ", options: ["1", "2", "3", "4"], correctIndex: 0)
+        #expect(!GameEngine.isValidRoundData(emptyQuestion))
+        let emptyOption = RoundData.trivia(question: "2+2?", options: ["1", "", "3", "4"], correctIndex: 0)
+        #expect(!GameEngine.isValidRoundData(emptyOption))
+    }
+
+    @Test func votePayloadWithEmptyPromptIsInvalid() {
+        #expect(!GameEngine.isValidRoundData(.vote(prompt: "")))
+        #expect(GameEngine.isValidRoundData(.vote(prompt: "Most likely to...")))
+    }
+
+    @Test func drawPayloadWithEmptyWordIsInvalid() {
+        #expect(!GameEngine.isValidRoundData(.draw(word: "  ", drawerId: UUID())))
+        #expect(GameEngine.isValidRoundData(.draw(word: "banana", drawerId: UUID())))
+    }
+
+    @Test func reflexPayloadIsAlwaysValid() {
+        #expect(GameEngine.isValidRoundData(.reflex))
+    }
+
+    @Test func followerRejectsAStructurallyInvalidRoundStartPayload() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+
+        let forged = RoundData.trivia(
+            question: "Forged",
+            options: ["1", "2", "3", "4", "5"],
+            correctIndex: 9
+        )
+        engine.applyFollowerMessage(.roundStart(data: forged, round: 1))
+
+        #expect(engine.currentRound == nil)
+        #expect(!engine.isRunning)
+    }
 }
 
 // MARK: - Follower (Joiner) State
@@ -280,8 +456,9 @@ struct GameEngineFollowerTests {
         let playerId = UUID()
 
         let data = RoundData.trivia(question: "2+2?", options: ["3", "4", "5", "6"], correctIndex: 1)
-        engine.applyFollowerMessage(.roundStart(data: data))
+        engine.applyFollowerMessage(.roundStart(data: data, round: 1))
         #expect(engine.isRunning)
+        #expect(engine.roundNumber == 1)
         if case .trivia(let question, _, _)? = engine.currentRound {
             #expect(question == "2+2?")
         } else {

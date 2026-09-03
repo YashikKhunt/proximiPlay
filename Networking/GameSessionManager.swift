@@ -114,6 +114,19 @@ final class GameSessionManager: NSObject, Sendable {
     /// actually owns.
     @MainActor let roster = PlayerRoster()
 
+    /// The peer this device invited via `joinHost(_:)` — `nil` on the host
+    /// itself (which never joins anyone) and before a joiner has invited a
+    /// host. This app's Multipeer session is star-shaped: a joiner only
+    /// ever connects to this one peer, so it doubles as "the host peer" for
+    /// validating that host-authoritative broadcasts genuinely originate
+    /// from the host rather than a forging fellow joiner. See `isFromHost`.
+    ///
+    /// Externally settable (like `isHost`/`myPlayer` above) so tests and
+    /// previews can exercise `isFromHost`/message-routing without a live
+    /// Multipeer session; production code only ever sets it from
+    /// `joinHost(_:)`/`startHosting()`/`stopSession()`.
+    @MainActor var hostPeerID: MCPeerID?
+
     // MARK: - Callbacks
 
     /// Invoked on `@MainActor` when a `GameMessage` arrives from a peer.
@@ -210,6 +223,7 @@ final class GameSessionManager: NSObject, Sendable {
         isHost = true
         myPlayer.isHost = true
         connectionState = .advertising
+        hostPeerID = nil
         roster.setHost(myPlayer)
 
         advertiser = MCNearbyServiceAdvertiser(
@@ -257,6 +271,7 @@ final class GameSessionManager: NSObject, Sendable {
         }
 
         connectionState = .connecting
+        hostPeerID = peerID
         browser.invitePeer(
             peerID,
             to: session,
@@ -288,6 +303,7 @@ final class GameSessionManager: NSObject, Sendable {
         connectionState = .idle
         isHost = false
         myPlayer.isHost = false
+        hostPeerID = nil
         roster.reset()
         lastGameStart = nil
         lastGameStartToken = 0
@@ -349,20 +365,43 @@ final class GameSessionManager: NSObject, Sendable {
 
     // MARK: - Message Validation
 
+    /// `true` when `peer` is safe to trust as the game host for
+    /// host-authoritative broadcasts (`.gameStart`, `.lobbyUpdate`,
+    /// `.roundStart`/`.roundResult`/`.gameEnd`, and relayed `.playerInput`
+    /// such as Speed Draw strokes) — i.e. this device is a joiner and
+    /// `peer` is the one peer it invited via `joinHost(_:)`. Always `false`
+    /// on the host itself, since the host is the origin of these messages,
+    /// never a legitimate recipient of one (a message claiming to be one of
+    /// these arriving at the host is necessarily forged).
+    @MainActor
+    func isFromHost(_ peer: MCPeerID) -> Bool {
+        !isHost && peer == hostPeerID
+    }
+
     /// Returns `true` when `message` is safe to route to `onMessageReceived`.
     ///
     /// `.playerInput` and `.disconnect` carry a self-asserted `playerId`
     /// that must match the `Player` the roster mapped to the delivering
     /// peer at join time — otherwise a peer could spoof another player's
-    /// identity. Every other message type passes through unchecked.
+    /// identity. The one exception is a `.playerInput` relayed by the host
+    /// itself to a joiner (this app's star-shaped session only ever relays
+    /// `.drawStroke` batches, never a peer's own scored input): joiners
+    /// have no `peerToPlayerId` mapping of their own to check the asserted
+    /// `playerId` against (only the host populates that map, from
+    /// `hostPlayerJoined`), but the host has already validated the
+    /// original sender against its own roster before relaying, so trust
+    /// follows transitively. Every other message type passes through
+    /// unchecked.
     ///
-    /// Pure aside from the `roster` read, so it is directly unit-testable:
-    /// populate `roster` via `hostPlayerJoined(peer:displayName:)` and call
-    /// this with any `MCPeerID`/`GameMessage` pair.
+    /// Pure aside from the `roster`/`hostPeerID`/`isHost` reads, so it is
+    /// directly unit-testable: populate `roster` via
+    /// `hostPlayerJoined(peer:displayName:)` and call this with any
+    /// `MCPeerID`/`GameMessage` pair.
     @MainActor
     func isMessageAuthentic(_ message: GameMessage, from peer: MCPeerID) -> Bool {
         switch message {
-        case .playerInput(let playerId, _):
+        case .playerInput(let playerId, _, _):
+            if isFromHost(peer) { return true }
             return roster.isValid(playerId: playerId, from: peer)
         case .disconnect(let playerId):
             return roster.isValid(playerId: playerId, from: peer)
@@ -393,14 +432,21 @@ final class GameSessionManager: NSObject, Sendable {
             return
         }
 
-        if case .lobbyUpdate(let players) = message, !isHost {
+        if case .lobbyUpdate(let players) = message, isFromHost(peerID) {
             roster.applyLobbyUpdate(players)
+            // `peerID` is already verified as the host peer above; record
+            // it against the host's own player id so this joiner can
+            // resolve `roster.peerID(for:)` for outbound messages (see
+            // `PlayerRoster.setHostPeerMapping`'s doc comment).
+            if let hostPlayer = players.first {
+                roster.setHostPeerMapping(peer: peerID, hostPlayerId: hostPlayer.id)
+            }
             if let assigned = players.first(where: { $0.displayName == myPlayer.displayName }) {
                 myPlayer = assigned
             }
         }
 
-        if case .gameStart(let mode, let config) = message {
+        if case .gameStart(let mode, let config) = message, isFromHost(peerID) {
             lastGameStart = (mode, config)
             lastGameStartToken += 1
         }

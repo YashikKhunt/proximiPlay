@@ -12,8 +12,21 @@ import Foundation
 nonisolated enum GameMessage: Codable, Sendable {
     case lobbyUpdate(players: [Player])
     case gameStart(mode: GameMode, config: GameConfig)
-    case roundStart(data: RoundData)
-    case playerInput(playerId: UUID, input: PlayerInput)
+    /// `round` is the host's `GameEngine.roundNumber` at the moment this
+    /// round started, so followers can track the in-progress round number
+    /// precisely (see `GameEngine.applyFollowerMessage`) — needed to stamp
+    /// and validate outgoing `.playerInput` messages against the round they
+    /// were actually submitted for (`GameEngine.submitInput`'s `round`
+    /// parameter).
+    case roundStart(data: RoundData, round: Int = 0)
+    /// `round` is the submitting device's own view of the round in
+    /// progress at submission time — `0` for `.drawStroke` batches, which
+    /// carry no round semantics and bypass `GameEngine.submitInput`
+    /// entirely (see `AppState`'s message-receive path). Every other input
+    /// case is validated against the host's current round before being
+    /// applied, so a late submission from a round the host has already
+    /// moved past is ignored rather than misapplied to the next round.
+    case playerInput(playerId: UUID, input: PlayerInput, round: Int = 0)
     case roundResult(result: RoundResult)
     case gameEnd(scores: [PlayerScore])
     case heartbeat(timestamp: Date)

@@ -92,6 +92,24 @@ final class PlayerRoster {
         self.players = players
     }
 
+    /// Records the mapping from the host's own `MCPeerID` to its
+    /// `Player.id`, for a joiner device — the one `peerToPlayerId` entry a
+    /// joiner ever needs, since this app's Multipeer session is
+    /// star-shaped (a joiner only ever directly connects to the host).
+    ///
+    /// Without this, `peerToPlayerId` stays empty on every joiner (only
+    /// `hostPlayerJoined` populates it, and that only ever runs on the
+    /// host), which silently breaks two things: `peerID(for:)` can never
+    /// resolve the host's peer, so a joiner can never address outbound
+    /// messages (`AppState.submitPlayerInput`, Speed Draw's stroke
+    /// sending) to the host at all; and `isValid(playerId:from:)` fails
+    /// closed for every relayed message, since it has nothing to check
+    /// against. Call this every time a `.lobbyUpdate` arrives from the
+    /// host (idempotent — just overwrites the same entry).
+    func setHostPeerMapping(peer: MCPeerID, hostPlayerId: UUID) {
+        peerToPlayerId[peer] = hostPlayerId
+    }
+
     // MARK: - Validation
 
     /// Returns `true` when `playerId` matches the `Player` the host mapped

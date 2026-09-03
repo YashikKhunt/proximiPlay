@@ -106,7 +106,21 @@ final class GameEngine {
     private var drawerQueue: [UUID] = []
     private var currentCorrectIndex: Int?
     private var currentDrawWord: String?
-    private var currentDrawerId: UUID?
+
+    /// The player id assigned as this round's Speed Draw drawer, derived
+    /// from `currentRound` rather than stored separately — `currentRound`
+    /// is already mirrored identically on host and joiner devices (host:
+    /// set directly in `runRound()`; joiner: mirrored via
+    /// `applyFollowerMessage`'s `.roundStart` case), so this reads
+    /// correctly on every device without any host-only bookkeeping. `nil`
+    /// outside Speed Draw or between rounds.
+    ///
+    /// Consulted by `AppState`'s message-receive path to reject
+    /// `.drawStroke` input asserted by anyone other than the actual drawer.
+    var currentDrawerId: UUID? {
+        guard case .draw(_, let drawerId)? = currentRound else { return nil }
+        return drawerId
+    }
 
     // MARK: - Init
 
@@ -157,10 +171,29 @@ final class GameEngine {
     /// once every expected player has responded (or, for Speed Draw, the
     /// moment a correct guess arrives).
     ///
-    /// Ignored if no game is running or `playerId` is not part of the
-    /// current roster (e.g. it already disconnected).
-    func submitInput(playerId: UUID, input: PlayerInput) {
+    /// - Parameter round: The round the submitting device believed was in
+    ///   progress when it sent this input. `nil` is reserved for trusted
+    ///   host-local submissions — the host's own player acting on its own
+    ///   `GameEngine` instance directly, with no network hop and therefore
+    ///   no possibility of arriving after the round has moved on — and is
+    ///   always treated as current. Every wire-relayed input (from
+    ///   `AppState`'s `.playerInput` handling) must pass its stamped round
+    ///   explicitly; a value that doesn't match `roundNumber` means the
+    ///   input was submitted against a round the host has since finished
+    ///   (e.g. it arrived just after that round's timeout), and is ignored
+    ///   rather than being misapplied — and misscored — against whichever
+    ///   round is running now.
+    ///
+    /// Ignored if no game is running, `playerId` is not part of the
+    /// current roster (e.g. it already disconnected), or `round` is stale.
+    func submitInput(playerId: UUID, input: PlayerInput, round: Int? = nil) {
         guard isRunning, let mode, players.contains(where: { $0.id == playerId }) else { return }
+        if let round, round != roundNumber {
+            Self.logger.warning(
+                "Ignored input for stale round \(round) (current round is \(self.roundNumber))"
+            )
+            return
+        }
 
         switch input {
         case .drawStroke:
@@ -198,6 +231,11 @@ final class GameEngine {
         inputs.removeValue(forKey: playerId)
         inputReceivedAt.removeValue(forKey: playerId)
         scores.removeValue(forKey: playerId)
+        // A departed player must never be assigned as a future Speed Draw
+        // drawer — left in place, `nextDrawerId()` would eventually
+        // `removeFirst()` their id into a dead round nobody can guess
+        // correctly, running the full round timeout for nothing.
+        drawerQueue.removeAll { $0 == playerId }
 
         guard players.count >= 2 else {
             finishRound()
@@ -215,10 +253,23 @@ final class GameEngine {
     /// message into the same observable properties a host-side view would
     /// read, so mode views render identically regardless of role. Every
     /// other `GameMessage` case is ignored.
+    ///
+    /// Callers are expected to have already verified the message actually
+    /// originates from the host (see `AppState`'s message-receive path) —
+    /// this method's own responsibility is limited to validating that a
+    /// `.roundStart` payload is structurally sane before mirroring it, so a
+    /// forged or corrupted broadcast (e.g. a trivia round with the wrong
+    /// option count or an out-of-range `correctIndex`) cannot reach mode
+    /// views and crash or misrender.
     func applyFollowerMessage(_ message: GameMessage) {
         switch message {
-        case .roundStart(let data):
+        case .roundStart(let data, let round):
+            guard Self.isValidRoundData(data) else {
+                Self.logger.warning("Rejected structurally invalid .roundStart payload")
+                return
+            }
             currentRound = data
+            roundNumber = round
             isRunning = true
 
         case .roundResult(let result):
@@ -263,7 +314,8 @@ final class GameEngine {
         drawerQueue = []
         currentCorrectIndex = nil
         currentDrawWord = nil
-        currentDrawerId = nil
+        // currentDrawerId is computed from currentRound (already cleared
+        // above), so no separate reset is needed.
     }
 
     // MARK: - Host: Round Lifecycle
@@ -296,7 +348,7 @@ final class GameEngine {
         }
 
         currentRound = data
-        sender.broadcast(.roundStart(data: data))
+        sender.broadcast(.roundStart(data: data, round: roundNumber))
 
         let timeout = config?.timePerRound ?? 20
         let expectedRound = roundNumber
@@ -395,7 +447,9 @@ final class GameEngine {
             wordDeck = deck
             let drawerId = nextDrawerId()
             currentDrawWord = word
-            currentDrawerId = drawerId
+            // currentDrawerId is derived from currentRound, which the
+            // caller (`runRound()`) sets to this returned `.draw` payload
+            // immediately after this call returns.
             return .draw(word: word, drawerId: drawerId)
 
         case .reflexTap:
@@ -477,6 +531,35 @@ final class GameEngine {
 /// Every scoring rule is a pure, `nonisolated` function of its inputs —
 /// unit-testable without any engine, actor hop, or MPC machinery.
 extension GameEngine {
+
+    /// Structural sanity check for an inbound `.roundStart` payload, applied
+    /// before `applyFollowerMessage` mirrors it into `currentRound`.
+    ///
+    /// A follower device has no other way to know a broadcast is
+    /// well-formed — the host normally guarantees this by construction via
+    /// `makeRoundData(for:)`, but a forged message (e.g. a malicious peer
+    /// impersonating the host, or a bit-flipped payload) could otherwise
+    /// carry a trivia round with the wrong option count or an
+    /// out-of-range `correctIndex`, crashing or misrendering every mode
+    /// view that force-unwraps `options[correctIndex]`.
+    nonisolated static func isValidRoundData(_ data: RoundData) -> Bool {
+        switch data {
+        case .trivia(let question, let options, let correctIndex):
+            return !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && options.count == 4
+                && options.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                && (0..<options.count).contains(correctIndex)
+
+        case .vote(let prompt):
+            return !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        case .draw(let word, _):
+            return !word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        case .reflex:
+            return true
+        }
+    }
 
     /// Trivia round score: `0` if incorrect; otherwise a base of `100` plus
     /// a speed bonus up to `100`, scaled linearly by the fraction of

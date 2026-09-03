@@ -85,12 +85,16 @@ struct VoteGameView: View {
             }
         }
         .hostLeftAlert()
+        .leaveGameGuard()
         .onChange(of: currentPrompt, initial: true) { _, newPrompt in
             handleNewRound(newPrompt)
         }
         .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
             guard newRoundNumber != nil else { return }
             presentReveal()
+        }
+        .onDisappear {
+            revealAutoAdvanceTask?.cancel()
         }
     }
 
@@ -223,24 +227,6 @@ struct VoteGameView: View {
         let round: RoundSnapshot
         let result: RoundResult
         let isFinal: Bool
-    }
-}
-
-// MARK: - Round Header
-
-private struct RoundHeaderView: View {
-    let roundNumber: Int
-    let totalRounds: Int
-
-    var body: some View {
-        HStack {
-            Text("Round \(roundNumber) of \(totalRounds)")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.secondary)
-            Spacer()
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Round \(roundNumber) of \(totalRounds)")
     }
 }
 
