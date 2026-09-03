@@ -10,6 +10,10 @@ struct LobbyView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
 
+    /// Host-only local selection — never synced live to joiners (see
+    /// `startGame()` doc comment for why). Defaults to the first mode.
+    @State private var selectedMode: GameMode = .quickTrivia
+
     private var sessionManager: GameSessionManager { appState.gameSessionManager }
 
     /// Every synced roster player except the local device — the "You"
@@ -88,45 +92,58 @@ struct LobbyView: View {
 
             // MARK: - Host Controls / Waiting Message
             if sessionManager.isHost {
-                // Game mode picker placeholder (Phase 2)
                 Section {
-                    HStack {
-                        Label("Game Mode", systemImage: "gamecontroller")
-                        Spacer()
-                        Text("Quick Trivia")
+                    VStack(alignment: .leading, spacing: 12) {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(GameMode.allCases) { mode in
+                                    GameModeCard(
+                                        mode: mode,
+                                        isSelected: mode == selectedMode
+                                    ) {
+                                        selectedMode = mode
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+
+                        Text(selectedMode.description)
+                            .font(.caption)
                             .foregroundStyle(Color.secondary)
                     }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Game Mode: Quick Trivia. Game mode selection is coming soon.")
+                    .padding(.vertical, 4)
                 } header: {
-                    Text("Settings")
-                } footer: {
-                    Text("Game mode selection coming in a future update.")
+                    Text("Game Mode")
                 }
 
                 Section {
                     Button {
-                        // Phase 2: start game
+                        startGame()
                     } label: {
                         Text("Start Game")
                             .font(.headline)
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(true)
+                    .disabled(otherPlayers.isEmpty)
                     .accessibilityLabel("Start Game")
-                    .accessibilityHint("Requires at least one other player to join")
+                    .accessibilityHint(
+                        otherPlayers.isEmpty
+                            ? "Requires at least one other player to join"
+                            : "Starts \(selectedMode.displayName) for everyone in the lobby"
+                    )
                 }
             } else {
                 Section {
                     HStack(spacing: 12) {
                         ProgressView()
                             .accessibilityHidden(true)
-                        Text("Waiting for host to start...")
+                        Text("Host is choosing a game…")
                             .foregroundStyle(Color.secondary)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Waiting for host to start the game")
+                    .accessibilityLabel("Waiting for the host to choose and start a game")
                 }
             }
         }
@@ -179,6 +196,95 @@ struct LobbyView: View {
             guard appState.currentGameState == .idle || appState.currentGameState == .lobby else { return }
             appState.leaveSession()
         }
+        // Joiner-side navigation trigger: the host drives its own navigation
+        // directly from `startGame()` below (it never receives its own
+        // broadcast), so this only ever fires on non-host devices once
+        // `sessionManager.lastGameStart` is populated by the `.gameStart`
+        // message arriving over the wire.
+        .onChange(of: sessionManager.lastGameStart?.mode) { _, newMode in
+            guard !sessionManager.isHost, let newMode else { return }
+            appState.currentGameState = .playing(newMode)
+            router.navigate(to: .game(newMode))
+        }
+    }
+
+    // MARK: - Actions
+
+    /// Host-only: broadcasts `.gameStart` for the currently selected mode and
+    /// navigates locally.
+    ///
+    /// There is deliberately no live "host is previewing X" broadcast to
+    /// joiners as `selectedMode` changes — `Models/GameMessage.swift` is
+    /// shared with a concurrent agent building the game engine, so no new
+    /// case is added there. Joiners instead see a generic "Host is choosing
+    /// a game…" line until the real `.gameStart` arrives.
+    private func startGame() {
+        let config = GameConfig.defaultConfig(for: selectedMode)
+        sessionManager.broadcast(.gameStart(mode: selectedMode, config: config))
+        appState.currentGameState = .playing(selectedMode)
+        router.navigate(to: .game(selectedMode))
+    }
+}
+
+// MARK: - GameModeCard
+
+/// A selectable card representing one `GameMode`, used in the host's game
+/// mode picker.
+private struct GameModeCard: View {
+    let mode: GameMode
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: mode.sfSymbol)
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(isSelected ? .white : Color.indigo)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        isSelected ? Color.indigo : Color.indigo.opacity(0.12),
+                        in: Circle()
+                    )
+                    .accessibilityHidden(true)
+
+                Text(mode.displayName)
+                    .font(.caption)
+                    .fontWeight(isSelected ? .semibold : .regular)
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+
+                if mode.isPremium {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.secondary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(minWidth: 88, minHeight: 44)
+            .background(
+                isSelected ? Color.indigo.opacity(0.12) : Color(uiColor: .secondarySystemBackground),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(isSelected ? Color.indigo : .clear, lineWidth: 2)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityHint("Double-tap to select \(mode.displayName) as the game mode")
+    }
+
+    private var accessibilityDescription: String {
+        var parts = [mode.displayName, mode.description]
+        if mode.isPremium { parts.append("Premium") }
+        return parts.joined(separator: ", ")
     }
 }
 

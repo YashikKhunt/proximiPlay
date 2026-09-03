@@ -13,16 +13,44 @@ import Foundation
 final class AppState {
     let gameSessionManager = GameSessionManager()
     let connectionMonitor = ConnectionMonitor()
+    let gameEngine: GameEngine
     var currentGameState: GameState = .idle
     var isPremiumUnlocked: Bool = false
 
     init() {
-        // Route incoming heartbeats to the monitor; Phase 2 game logic will
-        // extend this dispatch with gameplay messages.
+        let engine = GameEngine(sender: gameSessionManager)
+        gameEngine = engine
+
+        // Route incoming messages to their owning subsystem: heartbeats to
+        // the connection monitor, gameplay messages to the engine (as
+        // host-side input when this device is hosting, as follower state
+        // otherwise — the host never receives its own `.roundStart`/
+        // `.roundResult`/`.gameEnd` broadcasts back, so routing those
+        // unconditionally into `applyFollowerMessage` is safe on every
+        // device).
         let monitor = connectionMonitor
-        gameSessionManager.onMessageReceived = { message, peerID in
-            if case .heartbeat = message {
+        let sessionManager = gameSessionManager
+        gameSessionManager.onMessageReceived = { [weak sessionManager] message, peerID in
+            guard let sessionManager else { return }
+            switch message {
+            case .heartbeat:
                 monitor.recordHeartbeat(from: peerID)
+
+            case .playerInput(let playerId, let input):
+                if sessionManager.isHost {
+                    engine.submitInput(playerId: playerId, input: input)
+                }
+
+            case .disconnect(let playerId):
+                if sessionManager.isHost {
+                    engine.playerDisconnected(playerId)
+                }
+
+            case .roundStart, .roundResult, .gameEnd:
+                engine.applyFollowerMessage(message)
+
+            case .lobbyUpdate, .gameStart:
+                break
             }
         }
     }
@@ -36,6 +64,26 @@ final class AppState {
     /// lobby without the player actually leaving the session.
     func leaveSession() {
         connectionMonitor.stopMonitoring()
+        gameSessionManager.stopSession()
+        gameEngine.reset()
+    }
+
+    /// `true` once the Multipeer session disconnects while a game is in
+    /// progress — i.e. the host (or, on the host, every joiner) left
+    /// mid-game. Mode views observe this to surface a "host left" alert;
+    /// the alert UI itself is a later task.
+    var hostLeft: Bool {
+        if case .disconnected = gameSessionManager.connectionState, case .playing = currentGameState {
+            return true
+        }
+        return false
+    }
+
+    /// Clears game and session state after `hostLeft` fires, returning the
+    /// app to a clean idle state so navigation can reset to the root.
+    func resetAfterHostLeft() {
+        gameEngine.reset()
+        currentGameState = .idle
         gameSessionManager.stopSession()
     }
 

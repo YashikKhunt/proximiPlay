@@ -91,6 +91,13 @@ final class GameSessionManager: NSObject, Sendable {
     /// A join request awaiting the host's explicit accept/decline decision.
     @MainActor var pendingInvitation: PendingInvitation?
 
+    /// Set on joiner devices when a `.gameStart` message arrives from the
+    /// host. The host never observes this — it never receives its own
+    /// broadcast — so it drives navigation directly from its "Start Game"
+    /// action instead. Joiner-side views (`LobbyView`) observe this via
+    /// `.onChange` to navigate into the game once the host starts it.
+    @MainActor var lastGameStart: (mode: GameMode, config: GameConfig)?
+
     /// The host-authoritative player roster, kept in sync across every
     /// device via `.lobbyUpdate` broadcasts. Also consulted from the
     /// message-receive path to validate that inbound `.playerInput` /
@@ -273,6 +280,7 @@ final class GameSessionManager: NSObject, Sendable {
         isHost = false
         myPlayer.isHost = false
         roster.reset()
+        lastGameStart = nil
 
         Self.logger.info("Session stopped and state reset")
     }
@@ -380,6 +388,10 @@ final class GameSessionManager: NSObject, Sendable {
             if let assigned = players.first(where: { $0.displayName == myPlayer.displayName }) {
                 myPlayer = assigned
             }
+        }
+
+        if case .gameStart(let mode, let config) = message {
+            lastGameStart = (mode, config)
         }
 
         onMessageReceived?(message, peerID)

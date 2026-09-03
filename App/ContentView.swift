@@ -21,8 +21,7 @@ struct ContentView: View {
                     case .join:
                         JoinView()
                     case .game(let mode):
-                        // Placeholder for Phase 2
-                        Text("Game: \(mode.displayName)")
+                        GameHostView(mode: mode)
                     case .results:
                         // Placeholder for Phase 2
                         Text("Results")
