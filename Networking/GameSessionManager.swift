@@ -32,12 +32,17 @@ final class GameSessionManager: NSObject, Sendable {
     /// Bonjour service type. Must be 1-15 lowercase ASCII letters/hyphens.
     let serviceType = "proximiplay"
 
+    /// Maximum players in a session, host included.
+    static let maxPlayers = 8
+
     /// UserDefaults key for the archived MCPeerID.
     private static let peerIDKey = "proximiplay.myPeerID"
 
     // MARK: - Logger
 
-    private static let logger = Logger(
+    // nonisolated: Logger is Sendable and this is an immutable let, so it is
+    // safely callable from the nonisolated MPC delegate callbacks.
+    private nonisolated static let logger = Logger(
         subsystem: "com.proximiplay",
         category: "networking"
     )
@@ -45,16 +50,16 @@ final class GameSessionManager: NSObject, Sendable {
     // MARK: - Multipeer Objects
 
     /// The local peer identity, cached across launches.
-    nonisolated(unsafe) private let myPeerID: MCPeerID
+    @ObservationIgnored nonisolated private let myPeerID: MCPeerID
 
     /// The active connectivity session.
-    nonisolated(unsafe) private var session: MCSession!
+    @ObservationIgnored nonisolated(unsafe) private var session: MCSession!
 
     /// Advertises this device as a host that peers can join.
-    nonisolated(unsafe) private var advertiser: MCNearbyServiceAdvertiser!
+    @ObservationIgnored nonisolated(unsafe) private var advertiser: MCNearbyServiceAdvertiser!
 
     /// Browses for nearby hosts that this device can join.
-    nonisolated(unsafe) private var browser: MCNearbyServiceBrowser!
+    @ObservationIgnored nonisolated(unsafe) private var browser: MCNearbyServiceBrowser!
 
     // MARK: - Observable State
 
@@ -73,10 +78,22 @@ final class GameSessionManager: NSObject, Sendable {
     /// The local player representation, initialized from the device name.
     @MainActor var myPlayer: Player
 
+    /// A join request awaiting the host's explicit accept/decline decision.
+    @MainActor var pendingInvitation: PendingInvitation?
+
     // MARK: - Callbacks
 
     /// Invoked on `@MainActor` when a `GameMessage` arrives from a peer.
-    @MainActor var onMessageReceived: (@Sendable (GameMessage, MCPeerID) -> Void)?
+    @MainActor var onMessageReceived: (@MainActor @Sendable (GameMessage, MCPeerID) -> Void)?
+
+    // MARK: - Pending Invitation
+
+    /// A peer's request to join, held until the host accepts or declines.
+    struct PendingInvitation: Identifiable {
+        let id = UUID()
+        let peerName: String
+        let respond: (Bool, MCSession?) -> Void
+    }
 
     // MARK: - Connection State
 
@@ -249,7 +266,9 @@ final class GameSessionManager: NSObject, Sendable {
     ///   - message: The game message to send.
     ///   - peers: The target peers. Must not be empty.
     ///   - mode: `.reliable` for ordered delivery, `.unreliable` for speed.
-    func send(
+    // nonisolated so encoding + MCSession.send can run off the main actor
+    // (e.g. from the heartbeat loop); touches only nonisolated state.
+    nonisolated func send(
         _ message: GameMessage,
         to peers: [MCPeerID],
         mode: MCSessionSendDataMode = .reliable
@@ -274,7 +293,7 @@ final class GameSessionManager: NSObject, Sendable {
     /// `.reliable` delivery.
     ///
     /// - Parameter message: The game message to broadcast.
-    func broadcast(_ message: GameMessage) {
+    nonisolated func broadcast(_ message: GameMessage) {
         let peers = session.connectedPeers
         guard !peers.isEmpty else {
             Self.logger.debug("broadcast(_:) skipped — no connected peers")
@@ -390,10 +409,34 @@ extension GameSessionManager: MCNearbyServiceAdvertiserDelegate {
         withContext context: Data?,
         invitationHandler: @escaping (Bool, MCSession?) -> Void
     ) {
-        Self.logger.info(
-            "Auto-accepting invitation from: \(peerID.displayName)"
-        )
-        invitationHandler(true, session)
+        Self.logger.info("Received invitation from: \(peerID.displayName)")
+        Task { @MainActor in
+            // Enforce the player cap (host occupies one of maxPlayers slots)
+            // and hold at most one pending request at a time. Everything else
+            // waits for an explicit host decision — never auto-accept.
+            guard self.connectedPeers.count < Self.maxPlayers - 1,
+                  self.pendingInvitation == nil else {
+                Self.logger.info("Declined invitation from \(peerID.displayName) (full or busy)")
+                invitationHandler(false, nil)
+                return
+            }
+            self.pendingInvitation = PendingInvitation(
+                peerName: peerID.displayName,
+                respond: invitationHandler
+            )
+        }
+    }
+
+    /// Resolves the pending join request with the host's decision.
+    ///
+    /// Safe to call when no request is pending (no-op), so alert dismissal
+    /// and button actions can both route here without double-responding.
+    @MainActor
+    func respondToPendingInvitation(accept: Bool) {
+        guard let invitation = pendingInvitation else { return }
+        pendingInvitation = nil
+        invitation.respond(accept, accept ? session : nil)
+        Self.logger.info("Host \(accept ? "accepted" : "declined") join request from \(invitation.peerName)")
     }
 
     nonisolated func advertiser(

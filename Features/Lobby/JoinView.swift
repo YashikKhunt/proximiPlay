@@ -75,7 +75,9 @@ struct JoinView: View {
         .navigationBarTitleDisplayMode(.large)
         .onChange(of: sessionManager.connectionState) { _, newState in
             if case .connected = newState {
-                router.navigate(to: .lobby)
+                // Replace, don't push: back from the Lobby should return to
+                // Home, not to this stale mid-connection screen.
+                router.replaceTop(with: .lobby)
             }
         }
         .onDisappear {

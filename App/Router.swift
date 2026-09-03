@@ -27,6 +27,15 @@ final class Router {
         path.append(destination)
     }
 
+    /// Replaces the top-most destination with a new one, so transient screens
+    /// (e.g. the Join flow) don't linger in the back stack.
+    func replaceTop(with destination: Destination) {
+        if !path.isEmpty {
+            path.removeLast()
+        }
+        path.append(destination)
+    }
+
     /// Pops the top-most destination from the stack, if any.
     func pop() {
         guard !path.isEmpty else { return }

@@ -15,4 +15,15 @@ final class AppState {
     let connectionMonitor = ConnectionMonitor()
     var currentGameState: GameState = .idle
     var isPremiumUnlocked: Bool = false
+
+    init() {
+        // Route incoming heartbeats to the monitor; Phase 2 game logic will
+        // extend this dispatch with gameplay messages.
+        let monitor = connectionMonitor
+        gameSessionManager.onMessageReceived = { message, peerID in
+            if case .heartbeat = message {
+                monitor.recordHeartbeat(from: peerID)
+            }
+        }
+    }
 }

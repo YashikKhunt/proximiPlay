@@ -51,7 +51,7 @@ final class ConnectionMonitor {
 
     // MARK: - Logging
 
-    private static let logger = Logger(
+    private nonisolated static let logger = Logger(
         subsystem: "com.proximiplay",
         category: "connection-monitor"
     )
@@ -70,19 +70,23 @@ final class ConnectionMonitor {
         stopMonitoring()
         isMonitoring = true
 
-        monitoringTask = Task { [weak self] in
+        // Detached so heartbeat encoding + MCSession.send never run on the
+        // main actor; only the health-state writes hop back to @MainActor.
+        monitoringTask = Task.detached(priority: .utility) { [weak self, weak sessionManager] in
             while !Task.isCancelled {
-                guard let self else { return }
+                guard let self, let sessionManager else { return }
 
-                // If host, send heartbeat to all peers.
-                if sessionManager.isHost {
+                // If host, send heartbeat to all peers (off-main).
+                if await sessionManager.isHost {
                     sessionManager.broadcast(.heartbeat(timestamp: Date()))
                 }
 
                 // Evaluate health for all currently connected peers.
-                self.healthCheck(connectedPeers: sessionManager.connectedPeers)
+                let peers = await sessionManager.connectedPeers
+                await self.healthCheck(connectedPeers: peers)
 
-                try? await Task.sleep(for: .seconds(2))
+                // Generous tolerance lets the system coalesce wakeups.
+                try? await Task.sleep(for: .seconds(2), tolerance: .seconds(0.5))
             }
         }
     }
@@ -122,22 +126,28 @@ final class ConnectionMonitor {
         let now = Date()
 
         for peer in connectedPeers {
-            guard let last = lastHeartbeat[peer] else {
-                peerHealth[peer] = .lost
-                continue
+            let newHealth: PeerHealth
+
+            if let last = lastHeartbeat[peer] {
+                let elapsed = now.timeIntervalSince(last)
+                if elapsed < 2 {
+                    newHealth = .healthy
+                } else if elapsed < 5 {
+                    newHealth = .degraded
+                } else {
+                    newHealth = .lost
+                    Self.logger.warning(
+                        "Peer \(peer.displayName) heartbeat lost (last: \(elapsed, format: .fixed(precision: 1))s ago)"
+                    )
+                }
+            } else {
+                newHealth = .lost
             }
 
-            let elapsed = now.timeIntervalSince(last)
-
-            if elapsed < 2 {
-                peerHealth[peer] = .healthy
-            } else if elapsed < 5 {
-                peerHealth[peer] = .degraded
-            } else {
-                peerHealth[peer] = .lost
-                Self.logger.warning(
-                    "Peer \(peer.displayName) heartbeat lost (last: \(elapsed, format: .fixed(precision: 1))s ago)"
-                )
+            // Only write on change — @Observable has no value diffing, so an
+            // unconditional write would re-render observers every tick.
+            if peerHealth[peer] != newHealth {
+                peerHealth[peer] = newHealth
             }
         }
 

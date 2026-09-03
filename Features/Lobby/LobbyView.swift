@@ -129,7 +129,32 @@ struct LobbyView: View {
         }
         .navigationTitle("Game Lobby")
         .navigationBarTitleDisplayMode(.large)
+        .alert(
+            "Join Request",
+            isPresented: Binding(
+                get: { sessionManager.pendingInvitation != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        sessionManager.respondToPendingInvitation(accept: false)
+                    }
+                }
+            ),
+            presenting: sessionManager.pendingInvitation
+        ) { _ in
+            Button("Accept") {
+                sessionManager.respondToPendingInvitation(accept: true)
+            }
+            Button("Decline", role: .cancel) {
+                sessionManager.respondToPendingInvitation(accept: false)
+            }
+        } message: { invitation in
+            Text("\(invitation.peerName) wants to join your game.")
+        }
+        .task {
+            appState.connectionMonitor.startMonitoring(sessionManager: sessionManager)
+        }
         .onDisappear {
+            appState.connectionMonitor.stopMonitoring()
             sessionManager.stopSession()
         }
     }
