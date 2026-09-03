@@ -10,8 +10,9 @@ import SwiftUI
 /// Reached via `Router.Destination.game(mode)` after the host broadcasts
 /// `.gameStart` and every device navigates in. Still a thin shell — it
 /// switches over `mode` to hand off to that mode's dedicated view (Quick
-/// Trivia is the first one built; the rest keep rendering a placeholder
-/// until their own work lands) and, on the **host** device, kicks off the
+/// Trivia and Vote Battle are built; Speed Draw and Reflex Tap keep
+/// rendering a placeholder until their own work lands) and, on the
+/// **host** device, kicks off the
 /// host-authoritative `GameEngine` for modes whose view is ready to render
 /// its output. Joiners never call `startGame` — their engine state is fed
 /// entirely by `AppState`'s message routing (see `AppState.swift`).
@@ -28,7 +29,9 @@ struct GameHostView: View {
             switch mode {
             case .quickTrivia:
                 TriviaGameView()
-            case .voteBattle, .speedDraw, .reflexTap:
+            case .voteBattle:
+                VoteGameView()
+            case .speedDraw, .reflexTap:
                 placeholderView
             }
         }
@@ -43,7 +46,7 @@ struct GameHostView: View {
     /// if a game is already running, so this is safe to call every time the
     /// view appears.
     private func startEngineIfNeeded() {
-        guard sessionManager.isHost, mode == .quickTrivia else { return }
+        guard sessionManager.isHost, mode == .quickTrivia || mode == .voteBattle else { return }
         let roster = sessionManager.roster.players
         appState.gameEngine.startGame(
             mode: mode,
