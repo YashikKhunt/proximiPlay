@@ -6,6 +6,58 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4743515C30496C22001644A3 /* proximiPlayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743515B30496C22001644A3 /* proximiPlayApp.swift */; };
+		4743515E30496C22001644A3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743515D30496C22001644A3 /* ContentView.swift */; };
+		474351CA3049733E001644A3 /* GameSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351C93049733E001644A3 /* GameSessionManager.swift */; };
+		474351CB3049733E001644A3 /* GameSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351C93049733E001644A3 /* GameSessionManager.swift */; };
+		474351CC3049733E001644A3 /* GameSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351C93049733E001644A3 /* GameSessionManager.swift */; };
+		474351CE304974D3001644A3 /* ConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351CD304974D3001644A3 /* ConnectionMonitor.swift */; };
+		474351CF304974D3001644A3 /* ConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351CD304974D3001644A3 /* ConnectionMonitor.swift */; };
+		474351D0304974D3001644A3 /* ConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351CD304974D3001644A3 /* ConnectionMonitor.swift */; };
+		474351D3304974F3001644A3 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D2304974F3001644A3 /* PlayerStats.swift */; };
+		474351D4304974F3001644A3 /* GameHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D1304974F3001644A3 /* GameHistory.swift */; };
+		474351D5304974F3001644A3 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D2304974F3001644A3 /* PlayerStats.swift */; };
+		474351D6304974F3001644A3 /* GameHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D1304974F3001644A3 /* GameHistory.swift */; };
+		474351D7304974F3001644A3 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D2304974F3001644A3 /* PlayerStats.swift */; };
+		474351D8304974F3001644A3 /* GameHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D1304974F3001644A3 /* GameHistory.swift */; };
+		474351DB30497603001644A3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D930497603001644A3 /* AppState.swift */; };
+		474351DC30497603001644A3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351DA30497603001644A3 /* Router.swift */; };
+		474351DD30497603001644A3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D930497603001644A3 /* AppState.swift */; };
+		474351DE30497603001644A3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351DA30497603001644A3 /* Router.swift */; };
+		474351DF30497603001644A3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D930497603001644A3 /* AppState.swift */; };
+		474351E030497603001644A3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351DA30497603001644A3 /* Router.swift */; };
+		474351E230497639001644A3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351E130497639001644A3 /* HomeView.swift */; };
+		474351E330497639001644A3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351E130497639001644A3 /* HomeView.swift */; };
+		474351E430497639001644A3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351E130497639001644A3 /* HomeView.swift */; };
+		474351EF3049766B001644A3 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351EE3049766B001644A3 /* LobbyView.swift */; };
+		474351F03049766B001644A3 /* JoinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351ED3049766B001644A3 /* JoinView.swift */; };
+		474351F13049766B001644A3 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351EE3049766B001644A3 /* LobbyView.swift */; };
+		474351F23049766B001644A3 /* JoinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351ED3049766B001644A3 /* JoinView.swift */; };
+		474351F33049766B001644A3 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351EE3049766B001644A3 /* LobbyView.swift */; };
+		474351F43049766B001644A3 /* JoinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351ED3049766B001644A3 /* JoinView.swift */; };
+		474351F83049768C001644A3 /* ConnectionIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F53049768C001644A3 /* ConnectionIndicator.swift */; };
+		474351F93049768C001644A3 /* PlayerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F63049768C001644A3 /* PlayerBadge.swift */; };
+		474351FA3049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
+		474351FB3049768C001644A3 /* ConnectionIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F53049768C001644A3 /* ConnectionIndicator.swift */; };
+		474351FC3049768C001644A3 /* PlayerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F63049768C001644A3 /* PlayerBadge.swift */; };
+		474351FD3049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
+		474351FE3049768C001644A3 /* ConnectionIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F53049768C001644A3 /* ConnectionIndicator.swift */; };
+		474351FF3049768C001644A3 /* PlayerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F63049768C001644A3 /* PlayerBadge.swift */; };
+		474352003049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
+		AA00000100000001AABBCC01 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000001AABBCC01 /* Player.swift */; };
+		AA00000100000002AABBCC01 /* PlayerColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000002AABBCC01 /* PlayerColor.swift */; };
+		AA00000100000003AABBCC01 /* GameMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000003AABBCC01 /* GameMode.swift */; };
+		AA00000100000004AABBCC01 /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000004AABBCC01 /* GameState.swift */; };
+		AA00000100000005AABBCC01 /* GameConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000005AABBCC01 /* GameConfig.swift */; };
+		AA00000100000006AABBCC01 /* GameMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000006AABBCC01 /* GameMessage.swift */; };
+		AA00000100000007AABBCC01 /* PlayerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000007AABBCC01 /* PlayerInput.swift */; };
+		AA00000100000008AABBCC01 /* RoundData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000008AABBCC01 /* RoundData.swift */; };
+		AA00000100000009AABBCC01 /* RoundResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000009AABBCC01 /* RoundResult.swift */; };
+		AA0000010000000AAABBCC01 /* PlayerScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000AAAABBCC01 /* PlayerScore.swift */; };
+		AA0000010000000BAABBCC01 /* CodablePoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000BBAABBCC01 /* CodablePoint.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4743516830496C24001644A3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -25,13 +77,51 @@
 
 /* Begin PBXFileReference section */
 		4743515830496C22001644A3 /* proximiPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = proximiPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4743515B30496C22001644A3 /* proximiPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = proximiPlayApp.swift; sourceTree = "<group>"; };
+		4743515D30496C22001644A3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		4743516730496C24001644A3 /* proximiPlayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = proximiPlayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4743517130496C24001644A3 /* proximiPlayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = proximiPlayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		474351C93049733E001644A3 /* GameSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSessionManager.swift; sourceTree = "<group>"; };
+		474351CD304974D3001644A3 /* ConnectionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionMonitor.swift; sourceTree = "<group>"; };
+		474351D1304974F3001644A3 /* GameHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHistory.swift; sourceTree = "<group>"; };
+		474351D2304974F3001644A3 /* PlayerStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerStats.swift; sourceTree = "<group>"; };
+		474351D930497603001644A3 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		474351DA30497603001644A3 /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
+		474351E130497639001644A3 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		474351ED3049766B001644A3 /* JoinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinView.swift; sourceTree = "<group>"; };
+		474351EE3049766B001644A3 /* LobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyView.swift; sourceTree = "<group>"; };
+		474351F53049768C001644A3 /* ConnectionIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionIndicator.swift; sourceTree = "<group>"; };
+		474351F63049768C001644A3 /* PlayerBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBadge.swift; sourceTree = "<group>"; };
+		474351F73049768C001644A3 /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimaryButton.swift; sourceTree = "<group>"; };
+		AA00000200000001AABBCC01 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		AA00000200000002AABBCC01 /* PlayerColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerColor.swift; sourceTree = "<group>"; };
+		AA00000200000003AABBCC01 /* GameMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMode.swift; sourceTree = "<group>"; };
+		AA00000200000004AABBCC01 /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
+		AA00000200000005AABBCC01 /* GameConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameConfig.swift; sourceTree = "<group>"; };
+		AA00000200000006AABBCC01 /* GameMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMessage.swift; sourceTree = "<group>"; };
+		AA00000200000007AABBCC01 /* PlayerInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerInput.swift; sourceTree = "<group>"; };
+		AA00000200000008AABBCC01 /* RoundData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundData.swift; sourceTree = "<group>"; };
+		AA00000200000009AABBCC01 /* RoundResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundResult.swift; sourceTree = "<group>"; };
+		AA000002000000AAAABBCC01 /* PlayerScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerScore.swift; sourceTree = "<group>"; };
+		AA000002000000BBAABBCC01 /* CodablePoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodablePoint.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4743518530496CF9001644A3 /* Exceptions for "proximiPlay" folder in "proximiPlay" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4743515730496C22001644A3 /* proximiPlay */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4743515A30496C22001644A3 /* proximiPlay */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4743518530496CF9001644A3 /* Exceptions for "proximiPlay" folder in "proximiPlay" target */,
+			);
 			path = proximiPlay;
 			sourceTree = "<group>";
 		};
@@ -75,6 +165,12 @@
 		4743514F30496C22001644A3 = {
 			isa = PBXGroup;
 			children = (
+				4743519630496EBD001644A3 /* Resources */,
+				4743519330496EA1001644A3 /* Shared */,
+				4743519130496E8E001644A3 /* Models */,
+				4743519030496E83001644A3 /* Networking */,
+				4743518730496E10001644A3 /* Features */,
+				4743518630496DC4001644A3 /* App */,
 				4743515A30496C22001644A3 /* proximiPlay */,
 				4743516A30496C24001644A3 /* proximiPlayTests */,
 				4743517430496C24001644A3 /* proximiPlayUITests */,
@@ -90,6 +186,177 @@
 				4743517130496C24001644A3 /* proximiPlayUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4743518630496DC4001644A3 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				474351D930497603001644A3 /* AppState.swift */,
+				474351DA30497603001644A3 /* Router.swift */,
+				4743515B30496C22001644A3 /* proximiPlayApp.swift */,
+				4743515D30496C22001644A3 /* ContentView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		4743518730496E10001644A3 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				4743518F30496E6B001644A3 /* Results */,
+				4743518A30496E3F001644A3 /* Games */,
+				4743518930496E38001644A3 /* Lobby */,
+				4743518830496E2C001644A3 /* Home */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		4743518830496E2C001644A3 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				474351E130497639001644A3 /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		4743518930496E38001644A3 /* Lobby */ = {
+			isa = PBXGroup;
+			children = (
+				474351ED3049766B001644A3 /* JoinView.swift */,
+				474351EE3049766B001644A3 /* LobbyView.swift */,
+			);
+			path = Lobby;
+			sourceTree = "<group>";
+		};
+		4743518A30496E3F001644A3 /* Games */ = {
+			isa = PBXGroup;
+			children = (
+				4743518E30496E5A001644A3 /* ReflexTap */,
+				4743518D30496E55001644A3 /* SpeedDraw */,
+				4743518C30496E4F001644A3 /* VoteBattle */,
+				4743518B30496E46001644A3 /* QuickTrivia */,
+			);
+			path = Games;
+			sourceTree = "<group>";
+		};
+		4743518B30496E46001644A3 /* QuickTrivia */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = QuickTrivia;
+			sourceTree = "<group>";
+		};
+		4743518C30496E4F001644A3 /* VoteBattle */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = VoteBattle;
+			sourceTree = "<group>";
+		};
+		4743518D30496E55001644A3 /* SpeedDraw */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = SpeedDraw;
+			sourceTree = "<group>";
+		};
+		4743518E30496E5A001644A3 /* ReflexTap */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ReflexTap;
+			sourceTree = "<group>";
+		};
+		4743518F30496E6B001644A3 /* Results */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Results;
+			sourceTree = "<group>";
+		};
+		4743519030496E83001644A3 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				474351CD304974D3001644A3 /* ConnectionMonitor.swift */,
+				474351C93049733E001644A3 /* GameSessionManager.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		4743519130496E8E001644A3 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				4743519230496E97001644A3 /* Persistence */,
+				AA000002000000BBAABBCC01 /* CodablePoint.swift */,
+				AA00000200000005AABBCC01 /* GameConfig.swift */,
+				AA00000200000006AABBCC01 /* GameMessage.swift */,
+				AA00000200000003AABBCC01 /* GameMode.swift */,
+				AA00000200000004AABBCC01 /* GameState.swift */,
+				AA00000200000001AABBCC01 /* Player.swift */,
+				AA00000200000002AABBCC01 /* PlayerColor.swift */,
+				AA00000200000007AABBCC01 /* PlayerInput.swift */,
+				AA000002000000AAAABBCC01 /* PlayerScore.swift */,
+				AA00000200000008AABBCC01 /* RoundData.swift */,
+				AA00000200000009AABBCC01 /* RoundResult.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		4743519230496E97001644A3 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				474351D1304974F3001644A3 /* GameHistory.swift */,
+				474351D2304974F3001644A3 /* PlayerStats.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		4743519330496EA1001644A3 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				4743519530496EB7001644A3 /* Extensions */,
+				4743519430496EB1001644A3 /* Components */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		4743519430496EB1001644A3 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				474351F53049768C001644A3 /* ConnectionIndicator.swift */,
+				474351F63049768C001644A3 /* PlayerBadge.swift */,
+				474351F73049768C001644A3 /* PrimaryButton.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		4743519530496EB7001644A3 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		4743519630496EBD001644A3 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				4743519830496ECD001644A3 /* PromptPacks */,
+				4743519730496EC2001644A3 /* QuestionPacks */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		4743519730496EC2001644A3 /* QuestionPacks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = QuestionPacks;
+			sourceTree = "<group>";
+		};
+		4743519830496ECD001644A3 /* PromptPacks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = PromptPacks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -236,6 +503,31 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4743515E30496C22001644A3 /* ContentView.swift in Sources */,
+				474351F33049766B001644A3 /* LobbyView.swift in Sources */,
+				474351F43049766B001644A3 /* JoinView.swift in Sources */,
+				4743515C30496C22001644A3 /* proximiPlayApp.swift in Sources */,
+				AA00000100000001AABBCC01 /* Player.swift in Sources */,
+				AA00000100000002AABBCC01 /* PlayerColor.swift in Sources */,
+				AA00000100000003AABBCC01 /* GameMode.swift in Sources */,
+				AA00000100000004AABBCC01 /* GameState.swift in Sources */,
+				474351CA3049733E001644A3 /* GameSessionManager.swift in Sources */,
+				AA00000100000005AABBCC01 /* GameConfig.swift in Sources */,
+				AA00000100000006AABBCC01 /* GameMessage.swift in Sources */,
+				474351D0304974D3001644A3 /* ConnectionMonitor.swift in Sources */,
+				AA00000100000007AABBCC01 /* PlayerInput.swift in Sources */,
+				AA00000100000008AABBCC01 /* RoundData.swift in Sources */,
+				AA00000100000009AABBCC01 /* RoundResult.swift in Sources */,
+				AA0000010000000AAABBCC01 /* PlayerScore.swift in Sources */,
+				474351E330497639001644A3 /* HomeView.swift in Sources */,
+				474351DD30497603001644A3 /* AppState.swift in Sources */,
+				474351FB3049768C001644A3 /* ConnectionIndicator.swift in Sources */,
+				474351FC3049768C001644A3 /* PlayerBadge.swift in Sources */,
+				474351FD3049768C001644A3 /* PrimaryButton.swift in Sources */,
+				474351DE30497603001644A3 /* Router.swift in Sources */,
+				474351D7304974F3001644A3 /* PlayerStats.swift in Sources */,
+				474351D8304974F3001644A3 /* GameHistory.swift in Sources */,
+				AA0000010000000BAABBCC01 /* CodablePoint.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,6 +535,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				474351D3304974F3001644A3 /* PlayerStats.swift in Sources */,
+				474351D4304974F3001644A3 /* GameHistory.swift in Sources */,
+				474351CB3049733E001644A3 /* GameSessionManager.swift in Sources */,
+				474351F13049766B001644A3 /* LobbyView.swift in Sources */,
+				474351F83049768C001644A3 /* ConnectionIndicator.swift in Sources */,
+				474351F93049768C001644A3 /* PlayerBadge.swift in Sources */,
+				474351FA3049768C001644A3 /* PrimaryButton.swift in Sources */,
+				474351F23049766B001644A3 /* JoinView.swift in Sources */,
+				474351DF30497603001644A3 /* AppState.swift in Sources */,
+				474351E030497603001644A3 /* Router.swift in Sources */,
+				474351E230497639001644A3 /* HomeView.swift in Sources */,
+				474351CF304974D3001644A3 /* ConnectionMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -250,6 +554,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				474351E430497639001644A3 /* HomeView.swift in Sources */,
+				474351EF3049766B001644A3 /* LobbyView.swift in Sources */,
+				474351F03049766B001644A3 /* JoinView.swift in Sources */,
+				474351D5304974F3001644A3 /* PlayerStats.swift in Sources */,
+				474351D6304974F3001644A3 /* GameHistory.swift in Sources */,
+				474351DB30497603001644A3 /* AppState.swift in Sources */,
+				474351FE3049768C001644A3 /* ConnectionIndicator.swift in Sources */,
+				474351FF3049768C001644A3 /* PlayerBadge.swift in Sources */,
+				474352003049768C001644A3 /* PrimaryButton.swift in Sources */,
+				474351DC30497603001644A3 /* Router.swift in Sources */,
+				474351CC3049733E001644A3 /* GameSessionManager.swift in Sources */,
+				474351CE304974D3001644A3 /* ConnectionMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -400,11 +716,14 @@
 				DEVELOPMENT_TEAM = 452HCZLH4S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = proximiPlay/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ProximiPlay needs local network access to find nearby players.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -413,12 +732,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.yashik.proximiPlay;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -432,11 +755,14 @@
 				DEVELOPMENT_TEAM = 452HCZLH4S;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = proximiPlay/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ProximiPlay needs local network access to find nearby players.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -445,12 +771,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.yashik.proximiPlay;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
