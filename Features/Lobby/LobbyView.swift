@@ -8,8 +8,15 @@ import MultipeerConnectivity
 
 struct LobbyView: View {
     @Environment(AppState.self) private var appState
+    @Environment(Router.self) private var router
 
     private var sessionManager: GameSessionManager { appState.gameSessionManager }
+
+    /// Every synced roster player except the local device — the "You"
+    /// section above already covers self.
+    private var otherPlayers: [Player] {
+        sessionManager.roster.players.filter { $0.id != sessionManager.myPlayer.id }
+    }
 
     var body: some View {
         List {
@@ -56,31 +63,27 @@ struct LobbyView: View {
 
             // MARK: - Connected Players Section
             Section {
-                if sessionManager.connectedPeers.isEmpty {
+                if otherPlayers.isEmpty {
                     Label("No other players yet", systemImage: "person.2")
                         .font(.subheadline)
                         .foregroundStyle(Color.secondary)
                         .accessibilityLabel("No other players connected yet")
                 } else {
-                    ForEach(sessionManager.connectedPeers, id: \.self) { peer in
-                        ConnectedPlayerRow(peerID: peer)
+                    ForEach(otherPlayers) { player in
+                        PlayerBadge(player: player, peerHealth: appState.peerHealth(for: player))
+                            .padding(.vertical, 4)
                     }
                 }
             } header: {
                 HStack {
                     Text("Players")
                     Spacer()
-                    Text("\(sessionManager.connectedPeers.count + 1)/8")
+                    Text("\(sessionManager.roster.players.count)/\(GameSessionManager.maxPlayers)")
                         .monospacedDigit()
-                        .accessibilityLabel("\(sessionManager.connectedPeers.count + 1) of 8 players")
+                        .accessibilityLabel(
+                            "\(sessionManager.roster.players.count) of \(GameSessionManager.maxPlayers) players"
+                        )
                 }
-            }
-
-            // MARK: - Connection Status Section
-            Section {
-                ConnectionStatusRow(state: sessionManager.connectionState)
-            } header: {
-                Text("Connection")
             }
 
             // MARK: - Host Controls / Waiting Message
@@ -129,6 +132,21 @@ struct LobbyView: View {
         }
         .navigationTitle("Game Lobby")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(role: .destructive) {
+                    appState.leaveSession()
+                    router.popToRoot()
+                } label: {
+                    Label("Leave", systemImage: "xmark.circle")
+                }
+                .accessibilityLabel("Leave Game")
+                .accessibilityHint("Disconnects you from this game session")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                ConnectionIndicator(state: sessionManager.connectionState)
+            }
+        }
         .alert(
             "Join Request",
             isPresented: Binding(
@@ -154,91 +172,13 @@ struct LobbyView: View {
             appState.connectionMonitor.startMonitoring(sessionManager: sessionManager)
         }
         .onDisappear {
-            appState.connectionMonitor.stopMonitoring()
-            sessionManager.stopSession()
+            // Phase 2 pushes a game screen on top of the Lobby, which also
+            // triggers `.onDisappear` — only treat this as a genuine
+            // departure (not a mid-game push-cover) when we're not actively
+            // playing. Mirrors JoinView's connected-guard pattern.
+            guard appState.currentGameState == .idle || appState.currentGameState == .lobby else { return }
+            appState.leaveSession()
         }
-    }
-}
-
-// MARK: - ConnectedPlayerRow
-
-private struct ConnectedPlayerRow: View {
-    let peerID: MCPeerID
-
-    // Assign a deterministic color from the PlayerColor palette based on display name hash.
-    private var playerColor: Color {
-        let index = abs(peerID.displayName.hashValue) % PlayerColor.allCases.count
-        return PlayerColor.allCases[index].swiftUIColor
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(playerColor)
-                .frame(width: 36, height: 36)
-                .overlay {
-                    Text(peerID.displayName.prefix(1).uppercased())
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                }
-                .accessibilityHidden(true)
-
-            Text(peerID.displayName)
-                .font(.body)
-
-            Spacer()
-        }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(peerID.displayName)
-    }
-}
-
-// MARK: - ConnectionStatusRow
-
-private struct ConnectionStatusRow: View {
-    let state: GameSessionManager.ConnectionState
-
-    private var label: String {
-        switch state {
-        case .idle:                     return "Not connected"
-        case .advertising:             return "Waiting for players..."
-        case .browsing:                return "Searching..."
-        case .connecting:              return "Connecting..."
-        case .connected:               return "Connected"
-        case .disconnected(let reason): return "Disconnected: \(reason)"
-        }
-    }
-
-    private var symbolName: String {
-        switch state {
-        case .connected:               return "checkmark.circle.fill"
-        case .disconnected:            return "xmark.circle.fill"
-        case .connecting:              return "arrow.triangle.2.circlepath"
-        default:                       return "antenna.radiowaves.left.and.right"
-        }
-    }
-
-    private var symbolColor: Color {
-        switch state {
-        case .connected:    return .green
-        case .disconnected: return .red
-        case .connecting:   return .orange
-        default:            return .secondary
-        }
-    }
-
-    var body: some View {
-        Label {
-            Text(label)
-                .foregroundStyle(Color.primary)
-        } icon: {
-            Image(systemName: symbolName)
-                .foregroundStyle(symbolColor)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Connection status: \(label)")
     }
 }
 
@@ -249,6 +189,7 @@ private struct ConnectionStatusRow: View {
         LobbyView()
     }
     .environment(AppState())
+    .environment(Router())
 }
 
 #Preview("Dark") {
@@ -256,6 +197,7 @@ private struct ConnectionStatusRow: View {
         LobbyView()
     }
     .environment(AppState())
+    .environment(Router())
     .preferredColorScheme(.dark)
 }
 
@@ -264,5 +206,6 @@ private struct ConnectionStatusRow: View {
         LobbyView()
     }
     .environment(AppState())
+    .environment(Router())
     .dynamicTypeSize(.accessibility3)
 }

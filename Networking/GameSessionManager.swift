@@ -35,6 +35,16 @@ final class GameSessionManager: NSObject, Sendable {
     /// Maximum players in a session, host included.
     static let maxPlayers = 8
 
+    /// Maximum accepted size (in bytes) for an inbound message payload.
+    /// Anything larger is dropped before decoding — a defensive cap against
+    /// malformed or hostile peers, since `didReceive` fires for any bytes a
+    /// connected peer chooses to send.
+    ///
+    /// nonisolated: read directly from the nonisolated `didReceive` delegate
+    /// callback, before any `@MainActor` hop, so oversize payloads never
+    /// even reach decoding.
+    nonisolated static let maxPayloadBytes = 65536
+
     /// UserDefaults key for the archived MCPeerID.
     private static let peerIDKey = "proximiplay.myPeerID"
 
@@ -80,6 +90,13 @@ final class GameSessionManager: NSObject, Sendable {
 
     /// A join request awaiting the host's explicit accept/decline decision.
     @MainActor var pendingInvitation: PendingInvitation?
+
+    /// The host-authoritative player roster, kept in sync across every
+    /// device via `.lobbyUpdate` broadcasts. Also consulted from the
+    /// message-receive path to validate that inbound `.playerInput` /
+    /// `.disconnect` messages carry the `playerId` the delivering peer
+    /// actually owns.
+    @MainActor let roster = PlayerRoster()
 
     // MARK: - Callbacks
 
@@ -177,6 +194,7 @@ final class GameSessionManager: NSObject, Sendable {
         isHost = true
         myPlayer.isHost = true
         connectionState = .advertising
+        roster.setHost(myPlayer)
 
         advertiser = MCNearbyServiceAdvertiser(
             peer: myPeerID,
@@ -254,6 +272,7 @@ final class GameSessionManager: NSObject, Sendable {
         connectionState = .idle
         isHost = false
         myPlayer.isHost = false
+        roster.reset()
 
         Self.logger.info("Session stopped and state reset")
     }
@@ -301,6 +320,70 @@ final class GameSessionManager: NSObject, Sendable {
         }
         send(message, to: peers, mode: .reliable)
     }
+
+    /// Broadcasts the current roster to every connected peer. Host-only —
+    /// call after any roster mutation so every device renders an identical
+    /// player list.
+    @MainActor
+    private func broadcastLobbyUpdate() {
+        broadcast(.lobbyUpdate(players: roster.players))
+    }
+
+    // MARK: - Message Validation
+
+    /// Returns `true` when `message` is safe to route to `onMessageReceived`.
+    ///
+    /// `.playerInput` and `.disconnect` carry a self-asserted `playerId`
+    /// that must match the `Player` the roster mapped to the delivering
+    /// peer at join time — otherwise a peer could spoof another player's
+    /// identity. Every other message type passes through unchecked.
+    ///
+    /// Pure aside from the `roster` read, so it is directly unit-testable:
+    /// populate `roster` via `hostPlayerJoined(peer:displayName:)` and call
+    /// this with any `MCPeerID`/`GameMessage` pair.
+    @MainActor
+    func isMessageAuthentic(_ message: GameMessage, from peer: MCPeerID) -> Bool {
+        switch message {
+        case .playerInput(let playerId, _):
+            return roster.isValid(playerId: playerId, from: peer)
+        case .disconnect(let playerId):
+            return roster.isValid(playerId: playerId, from: peer)
+        default:
+            return true
+        }
+    }
+
+    /// Returns `true` when `data` exceeds `maxPayloadBytes` and should be
+    /// dropped before attempting to decode it.
+    ///
+    /// A free function of `Data`, so it is directly unit-testable without
+    /// any session/peer machinery.
+    nonisolated static func isOversizedPayload(_ data: Data) -> Bool {
+        data.count > maxPayloadBytes
+    }
+
+    /// Validates and routes a decoded inbound message: drops spoofed
+    /// `.playerInput`/`.disconnect` messages, mirrors `.lobbyUpdate` into
+    /// the local roster on joiner devices, then forwards every message that
+    /// passes validation to `onMessageReceived`.
+    @MainActor
+    private func receive(_ message: GameMessage, from peerID: MCPeerID) {
+        guard isMessageAuthentic(message, from: peerID) else {
+            Self.logger.warning(
+                "Dropped message from \(peerID.displayName) — playerId did not match roster mapping"
+            )
+            return
+        }
+
+        if case .lobbyUpdate(let players) = message, !isHost {
+            roster.applyLobbyUpdate(players)
+            if let assigned = players.first(where: { $0.displayName == myPlayer.displayName }) {
+                myPlayer = assigned
+            }
+        }
+
+        onMessageReceived?(message, peerID)
+    }
 }
 
 // MARK: - MCSessionDelegate
@@ -324,6 +407,10 @@ extension GameSessionManager: MCSessionDelegate {
                         reason: "\(displayName) disconnected"
                     )
                 }
+                if self.isHost {
+                    self.roster.hostPlayerLeft(peer: peerID)
+                    self.broadcastLobbyUpdate()
+                }
             }
 
         case .connecting:
@@ -339,6 +426,11 @@ extension GameSessionManager: MCSessionDelegate {
                     self.connectedPeers.append(peerID)
                 }
                 self.connectionState = .connected
+
+                if self.isHost {
+                    self.roster.hostPlayerJoined(peer: peerID, displayName: displayName)
+                    self.broadcastLobbyUpdate()
+                }
             }
 
         @unknown default:
@@ -353,13 +445,20 @@ extension GameSessionManager: MCSessionDelegate {
         didReceive data: Data,
         fromPeer peerID: MCPeerID
     ) {
+        guard !Self.isOversizedPayload(data) else {
+            Self.logger.warning(
+                "Dropped oversize payload from \(peerID.displayName): \(data.count) bytes exceeds \(Self.maxPayloadBytes)-byte cap"
+            )
+            return
+        }
+
         do {
             let message = try GameMessage.decoded(from: data)
             Self.logger.debug(
                 "Received message from \(peerID.displayName)"
             )
             Task { @MainActor in
-                self.onMessageReceived?(message, peerID)
+                self.receive(message, from: peerID)
             }
         } catch {
             Self.logger.error(

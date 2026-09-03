@@ -26,4 +26,26 @@ final class AppState {
             }
         }
     }
+
+    /// Explicitly tears down the active session and stops connection
+    /// monitoring.
+    ///
+    /// Call this from a deliberate user action — a "Leave" button or real
+    /// back-navigation out of the lobby — never from `.onDisappear`
+    /// unconditionally, since Phase 2 pushes a game screen on top of the
+    /// lobby without the player actually leaving the session.
+    func leaveSession() {
+        connectionMonitor.stopMonitoring()
+        gameSessionManager.stopSession()
+    }
+
+    /// Bridges a synced roster `Player` to its live connection health by
+    /// looking up the peer the host originally mapped them to.
+    ///
+    /// Returns `nil` for the local player (never tracked in
+    /// `ConnectionMonitor`) and for players with no recorded heartbeat yet.
+    func peerHealth(for player: Player) -> ConnectionMonitor.PeerHealth? {
+        guard let peerID = gameSessionManager.roster.peerID(for: player.id) else { return nil }
+        return connectionMonitor.peerHealth[peerID]
+    }
 }
