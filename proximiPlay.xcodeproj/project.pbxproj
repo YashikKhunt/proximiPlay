@@ -51,6 +51,7 @@
 		B034595888584DBBA8092386 /* DrawGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */; };
 		5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359B8E67520F47C9B88480CE /* GuessInputView.swift */; };
 		EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183F02246B3748469E7AC70C /* ReflexGameView.swift */; };
+		2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +83,7 @@
 		84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawGameView.swift; sourceTree = "<group>"; };
 		359B8E67520F47C9B88480CE /* GuessInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessInputView.swift; sourceTree = "<group>"; };
 		183F02246B3748469E7AC70C /* ReflexGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflexGameView.swift; sourceTree = "<group>"; };
+		1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
 		4743515830496C22001644A3 /* proximiPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = proximiPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4743515B30496C22001644A3 /* proximiPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = proximiPlayApp.swift; sourceTree = "<group>"; };
 		4743515D30496C22001644A3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -295,6 +297,7 @@
 		4743518F30496E6B001644A3 /* Results */ = {
 			isa = PBXGroup;
 			children = (
+				1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */,
 			);
 			path = Results;
 			sourceTree = "<group>";
@@ -580,6 +583,7 @@
 				B034595888584DBBA8092386 /* DrawGameView.swift in Sources */,
 				5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */,
 				EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */,
+				2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -98,6 +98,15 @@ final class GameSessionManager: NSObject, Sendable {
     /// `.onChange` to navigate into the game once the host starts it.
     @MainActor var lastGameStart: (mode: GameMode, config: GameConfig)?
 
+    /// Monotonically increments every time a `.gameStart` message arrives,
+    /// even when it repeats the exact same mode/config (e.g. the host's
+    /// "Play Again" on `ResultsView`) — `lastGameStart` alone wouldn't
+    /// re-fire a SwiftUI `.onChange` in that case since its value wouldn't
+    /// actually change. Observe this token instead of `lastGameStart`
+    /// itself wherever a message needs to reliably re-trigger on every
+    /// rebroadcast, not just the first.
+    @MainActor var lastGameStartToken: Int = 0
+
     /// The host-authoritative player roster, kept in sync across every
     /// device via `.lobbyUpdate` broadcasts. Also consulted from the
     /// message-receive path to validate that inbound `.playerInput` /
@@ -281,6 +290,7 @@ final class GameSessionManager: NSObject, Sendable {
         myPlayer.isHost = false
         roster.reset()
         lastGameStart = nil
+        lastGameStartToken = 0
 
         Self.logger.info("Session stopped and state reset")
     }
@@ -392,6 +402,7 @@ final class GameSessionManager: NSObject, Sendable {
 
         if case .gameStart(let mode, let config) = message {
             lastGameStart = (mode, config)
+            lastGameStartToken += 1
         }
 
         onMessageReceived?(message, peerID)

@@ -23,8 +23,7 @@ struct ContentView: View {
                     case .game(let mode):
                         GameHostView(mode: mode)
                     case .results:
-                        // Placeholder for Phase 2
-                        Text("Results")
+                        ResultsView()
                     }
                 }
         }
