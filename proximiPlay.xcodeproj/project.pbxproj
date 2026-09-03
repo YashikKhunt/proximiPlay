@@ -42,6 +42,8 @@
 		BB00000100000005AABBCC02 /* mostlikely.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000005AABBCC02 /* mostlikely.json */; };
 		BB00000100000006AABBCC02 /* wouldyourather.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000006AABBCC02 /* wouldyourather.json */; };
 		D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36511A62C2A5483193C1F642 /* GameEngine.swift */; };
+		EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E514E52689042D9980EB75F /* TriviaGameView.swift */; };
+		54D8F06C52974995B32DD276 /* TriviaRoundResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +66,8 @@
 /* Begin PBXFileReference section */
 		2661225BD61D4218B970D3AA /* DrawWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawWords.swift; sourceTree = "<group>"; };
 		36511A62C2A5483193C1F642 /* GameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameEngine.swift; sourceTree = "<group>"; };
+		0E514E52689042D9980EB75F /* TriviaGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaGameView.swift; sourceTree = "<group>"; };
+		78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaRoundResultView.swift; sourceTree = "<group>"; };
 		4743515830496C22001644A3 /* proximiPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = proximiPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4743515B30496C22001644A3 /* proximiPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = proximiPlayApp.swift; sourceTree = "<group>"; };
 		4743515D30496C22001644A3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -240,6 +244,8 @@
 		4743518B30496E46001644A3 /* QuickTrivia */ = {
 			isa = PBXGroup;
 			children = (
+				0E514E52689042D9980EB75F /* TriviaGameView.swift */,
+				78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */,
 			);
 			path = QuickTrivia;
 			sourceTree = "<group>";
@@ -543,6 +549,8 @@
 				BB00000100000002AABBCC02 /* ContentPackLoader.swift in Sources */,
 				4D3AC1A00E3939890994760F /* GameHostView.swift in Sources */,
 				D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */,
+				EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */,
+				54D8F06C52974995B32DD276 /* TriviaRoundResultView.swift in Sources */,
 				6E1182C36D114409B4CABAD9 /* DrawWords.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

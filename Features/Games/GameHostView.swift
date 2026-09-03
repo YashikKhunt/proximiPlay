@@ -8,13 +8,13 @@ import SwiftUI
 /// Container view hosting the active mini-game for a given `GameMode`.
 ///
 /// Reached via `Router.Destination.game(mode)` after the host broadcasts
-/// `.gameStart` and every device navigates in. This is a thin shell for now
-/// — it switches over `mode` to render placeholder per-mode content and
-/// reads `appState.currentGameState` for the high-level phase. It
-/// deliberately does not call any game-engine API, since the engine
-/// (`Features/Games/GameEngine.swift`) is being built concurrently; each
-/// mode's dedicated view will replace its placeholder section as that work
-/// lands.
+/// `.gameStart` and every device navigates in. Still a thin shell — it
+/// switches over `mode` to hand off to that mode's dedicated view (Quick
+/// Trivia is the first one built; the rest keep rendering a placeholder
+/// until their own work lands) and, on the **host** device, kicks off the
+/// host-authoritative `GameEngine` for modes whose view is ready to render
+/// its output. Joiners never call `startGame` — their engine state is fed
+/// entirely by `AppState`'s message routing (see `AppState.swift`).
 struct GameHostView: View {
     let mode: GameMode
 
@@ -24,6 +24,37 @@ struct GameHostView: View {
     private var sessionManager: GameSessionManager { appState.gameSessionManager }
 
     var body: some View {
+        Group {
+            switch mode {
+            case .quickTrivia:
+                TriviaGameView()
+            case .voteBattle, .speedDraw, .reflexTap:
+                placeholderView
+            }
+        }
+        .task {
+            startEngineIfNeeded()
+        }
+    }
+
+    /// Starts the host-authoritative engine for modes whose dedicated view
+    /// is wired up to render it. No-op on joiner devices (`AppState`
+    /// mirrors the host's broadcasts into the engine instead) and a no-op
+    /// if a game is already running, so this is safe to call every time the
+    /// view appears.
+    private func startEngineIfNeeded() {
+        guard sessionManager.isHost, mode == .quickTrivia else { return }
+        let roster = sessionManager.roster.players
+        appState.gameEngine.startGame(
+            mode: mode,
+            roster: roster,
+            config: GameConfig.defaultConfig(for: mode, playerCount: roster.count)
+        )
+    }
+
+    // MARK: - Placeholder (modes without a dedicated view yet)
+
+    private var placeholderView: some View {
         VStack(spacing: 24) {
             Spacer()
 

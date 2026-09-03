@@ -87,6 +87,31 @@ final class AppState {
         gameSessionManager.stopSession()
     }
 
+    /// Submits `input` on behalf of the local player, routing it correctly
+    /// regardless of role: the **host** feeds it straight into its local
+    /// `GameEngine` (the source of truth, no round trip needed); a
+    /// **joiner** has no engine driving the game, so it sends a
+    /// `.playerInput` message to the host over the wire instead.
+    ///
+    /// Shared across every mode view so each one only ever writes a single
+    /// `appState.submitPlayerInput(...)` call rather than re-deriving this
+    /// host/joiner branch itself.
+    ///
+    /// No-op if this device is a joiner with no resolvable host peer (e.g.
+    /// the host has already disconnected — `hostLeft` will be surfacing an
+    /// alert in that case anyway).
+    func submitPlayerInput(_ input: PlayerInput) {
+        let sessionManager = gameSessionManager
+        if sessionManager.isHost {
+            gameEngine.submitInput(playerId: sessionManager.myPlayer.id, input: input)
+            return
+        }
+
+        guard let hostPlayer = sessionManager.roster.players.first,
+              let hostPeer = sessionManager.roster.peerID(for: hostPlayer.id) else { return }
+        sessionManager.send(.playerInput(playerId: sessionManager.myPlayer.id, input: input), to: [hostPeer])
+    }
+
     /// Bridges a synced roster `Player` to its live connection health by
     /// looking up the peer the host originally mapped them to.
     ///
