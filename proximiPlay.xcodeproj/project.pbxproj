@@ -10,41 +10,17 @@
 		4743515C30496C22001644A3 /* proximiPlayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743515B30496C22001644A3 /* proximiPlayApp.swift */; };
 		4743515E30496C22001644A3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743515D30496C22001644A3 /* ContentView.swift */; };
 		474351CA3049733E001644A3 /* GameSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351C93049733E001644A3 /* GameSessionManager.swift */; };
-		474351CB3049733E001644A3 /* GameSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351C93049733E001644A3 /* GameSessionManager.swift */; };
-		474351CC3049733E001644A3 /* GameSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351C93049733E001644A3 /* GameSessionManager.swift */; };
-		474351CE304974D3001644A3 /* ConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351CD304974D3001644A3 /* ConnectionMonitor.swift */; };
-		474351CF304974D3001644A3 /* ConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351CD304974D3001644A3 /* ConnectionMonitor.swift */; };
 		474351D0304974D3001644A3 /* ConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351CD304974D3001644A3 /* ConnectionMonitor.swift */; };
-		474351D3304974F3001644A3 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D2304974F3001644A3 /* PlayerStats.swift */; };
-		474351D4304974F3001644A3 /* GameHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D1304974F3001644A3 /* GameHistory.swift */; };
-		474351D5304974F3001644A3 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D2304974F3001644A3 /* PlayerStats.swift */; };
-		474351D6304974F3001644A3 /* GameHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D1304974F3001644A3 /* GameHistory.swift */; };
 		474351D7304974F3001644A3 /* PlayerStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D2304974F3001644A3 /* PlayerStats.swift */; };
 		474351D8304974F3001644A3 /* GameHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D1304974F3001644A3 /* GameHistory.swift */; };
-		474351DB30497603001644A3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D930497603001644A3 /* AppState.swift */; };
-		474351DC30497603001644A3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351DA30497603001644A3 /* Router.swift */; };
 		474351DD30497603001644A3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D930497603001644A3 /* AppState.swift */; };
 		474351DE30497603001644A3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351DA30497603001644A3 /* Router.swift */; };
-		474351DF30497603001644A3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351D930497603001644A3 /* AppState.swift */; };
-		474351E030497603001644A3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351DA30497603001644A3 /* Router.swift */; };
-		474351E230497639001644A3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351E130497639001644A3 /* HomeView.swift */; };
 		474351E330497639001644A3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351E130497639001644A3 /* HomeView.swift */; };
-		474351E430497639001644A3 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351E130497639001644A3 /* HomeView.swift */; };
-		474351EF3049766B001644A3 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351EE3049766B001644A3 /* LobbyView.swift */; };
-		474351F03049766B001644A3 /* JoinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351ED3049766B001644A3 /* JoinView.swift */; };
-		474351F13049766B001644A3 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351EE3049766B001644A3 /* LobbyView.swift */; };
-		474351F23049766B001644A3 /* JoinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351ED3049766B001644A3 /* JoinView.swift */; };
 		474351F33049766B001644A3 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351EE3049766B001644A3 /* LobbyView.swift */; };
 		474351F43049766B001644A3 /* JoinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351ED3049766B001644A3 /* JoinView.swift */; };
-		474351F83049768C001644A3 /* ConnectionIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F53049768C001644A3 /* ConnectionIndicator.swift */; };
-		474351F93049768C001644A3 /* PlayerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F63049768C001644A3 /* PlayerBadge.swift */; };
-		474351FA3049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
 		474351FB3049768C001644A3 /* ConnectionIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F53049768C001644A3 /* ConnectionIndicator.swift */; };
 		474351FC3049768C001644A3 /* PlayerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F63049768C001644A3 /* PlayerBadge.swift */; };
 		474351FD3049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
-		474351FE3049768C001644A3 /* ConnectionIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F53049768C001644A3 /* ConnectionIndicator.swift */; };
-		474351FF3049768C001644A3 /* PlayerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F63049768C001644A3 /* PlayerBadge.swift */; };
-		474352003049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
 		AA00000100000001AABBCC01 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000001AABBCC01 /* Player.swift */; };
 		AA00000100000002AABBCC01 /* PlayerColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000002AABBCC01 /* PlayerColor.swift */; };
 		AA00000100000003AABBCC01 /* GameMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000003AABBCC01 /* GameMode.swift */; };
@@ -535,18 +511,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				474351D3304974F3001644A3 /* PlayerStats.swift in Sources */,
-				474351D4304974F3001644A3 /* GameHistory.swift in Sources */,
-				474351CB3049733E001644A3 /* GameSessionManager.swift in Sources */,
-				474351F13049766B001644A3 /* LobbyView.swift in Sources */,
-				474351F83049768C001644A3 /* ConnectionIndicator.swift in Sources */,
-				474351F93049768C001644A3 /* PlayerBadge.swift in Sources */,
-				474351FA3049768C001644A3 /* PrimaryButton.swift in Sources */,
-				474351F23049766B001644A3 /* JoinView.swift in Sources */,
-				474351DF30497603001644A3 /* AppState.swift in Sources */,
-				474351E030497603001644A3 /* Router.swift in Sources */,
-				474351E230497639001644A3 /* HomeView.swift in Sources */,
-				474351CF304974D3001644A3 /* ConnectionMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -554,18 +518,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				474351E430497639001644A3 /* HomeView.swift in Sources */,
-				474351EF3049766B001644A3 /* LobbyView.swift in Sources */,
-				474351F03049766B001644A3 /* JoinView.swift in Sources */,
-				474351D5304974F3001644A3 /* PlayerStats.swift in Sources */,
-				474351D6304974F3001644A3 /* GameHistory.swift in Sources */,
-				474351DB30497603001644A3 /* AppState.swift in Sources */,
-				474351FE3049768C001644A3 /* ConnectionIndicator.swift in Sources */,
-				474351FF3049768C001644A3 /* PlayerBadge.swift in Sources */,
-				474352003049768C001644A3 /* PrimaryButton.swift in Sources */,
-				474351DC30497603001644A3 /* Router.swift in Sources */,
-				474351CC3049733E001644A3 /* GameSessionManager.swift in Sources */,
-				474351CE304974D3001644A3 /* ConnectionMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -638,7 +590,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -696,7 +648,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -792,7 +744,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 452HCZLH4S;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yashik.proximiPlayTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -814,7 +766,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 452HCZLH4S;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yashik.proximiPlayTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
