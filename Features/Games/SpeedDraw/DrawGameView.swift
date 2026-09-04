@@ -9,13 +9,16 @@ import SwiftUI
 /// Renders one Speed Draw game end-to-end: word → draw/guess → reveal →
 /// next round, purely from `GameEngine`'s observable state.
 ///
-/// Follows `TriviaGameView`/`VoteGameView`'s established pattern exactly: a
-/// local FIFO `roundQueue`/`revealSnapshot` pair avoids the same-tick
-/// `currentRound` → `lastRoundResult` race described in `TriviaGameView`'s
-/// doc comment, and every branch below reads `appState.gameEngine` only, so
-/// host and joiner devices render identically. Role only ever changes what's
-/// *displayed and interactive* — the drawer sees the word and a live canvas,
-/// everyone else sees a read-only canvas and `GuessInputView`.
+/// Follows `TriviaGameView`/`VoteGameView`'s established pattern exactly:
+/// round sequencing lives in the shared ``RoundFlow`` coordinator, whose FIFO
+/// queue avoids the same-tick `currentRound` → `lastRoundResult` race
+/// described in its doc comment, and every branch below reads
+/// `appState.gameEngine` only, so host and joiner devices render identically.
+/// Role only ever changes what's *displayed and interactive* — the drawer
+/// sees the word and a live canvas, everyone else sees a read-only canvas and
+/// `GuessInputView`. A round ending early on the first correct guess is
+/// entirely `GameEngine`'s doing, so it needs nothing from `RoundFlow` beyond
+/// the result arriving sooner.
 ///
 /// ## Why the word is never hidden from `RoundData`
 ///
@@ -42,15 +45,7 @@ struct DrawGameView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
 
-    /// Rounds this device has seen start, oldest-first, awaiting their
-    /// reveal. In practice at most one or two entries deep.
-    @State private var roundQueue: [RoundSnapshot] = []
-    @State private var revealSnapshot: RevealSnapshot?
-    @State private var revealAutoAdvanceTask: Task<Void, Never>?
-    /// Cumulative scores as of the most recently shown reveal — the
-    /// baseline the *next* reveal diffs against to show per-round point
-    /// gains. Empty before round 1 (everyone starts at 0).
-    @State private var scoresBeforeReveal: [UUID: Int] = [:]
+    @State private var flow = RoundFlow<RoundSnapshot>()
 
     private var engine: GameEngine { appState.gameEngine }
     private var myPlayerId: UUID { appState.gameSessionManager.myPlayer.id }
@@ -69,26 +64,26 @@ struct DrawGameView: View {
 
     var body: some View {
         Group {
-            if let revealSnapshot {
+            if let reveal = flow.reveal {
                 DrawRoundResultView(
-                    roundNumber: revealSnapshot.round.roundIndex,
+                    roundNumber: reveal.round.index,
                     totalRounds: totalRounds,
-                    word: revealSnapshot.round.word,
-                    drawerId: revealSnapshot.round.drawerId,
+                    word: reveal.round.payload.word,
+                    drawerId: reveal.round.payload.drawerId,
                     myPlayerId: myPlayerId,
-                    result: revealSnapshot.result,
-                    previousScores: revealSnapshot.baselineScores,
-                    isFinalRound: revealSnapshot.isFinal
+                    result: reveal.result,
+                    previousScores: reveal.baselineScores,
+                    isFinalRound: reveal.isFinal
                 ) {
                     router.navigate(to: .results)
                 }
-            } else if let current = roundQueue.last {
+            } else if let current = flow.current {
                 playingView(current)
             } else {
                 waitingView
             }
         }
-        .animation(.default, value: revealSnapshot != nil)
+        .animation(.default, value: flow.reveal != nil)
         .navigationTitle(GameMode.speedDraw.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -98,16 +93,19 @@ struct DrawGameView: View {
         }
         .hostLeftAlert()
         .leaveGameGuard()
-        .onChange(of: currentDrawPayload, initial: true) { _, newPayload in
-            handleNewRound(newPayload)
-        }
-        .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
-            guard newRoundNumber != nil else { return }
-            presentReveal()
-        }
-        .onDisappear {
-            revealAutoAdvanceTask?.cancel()
-        }
+        .roundFlow(
+            flow,
+            engine: engine,
+            roundTrigger: currentDrawPayload,
+            beginRound: { payload, _ in
+                guard let payload else { return nil }
+                return RoundSnapshot(word: payload.word, drawerId: payload.drawerId)
+            },
+            onRoundStart: { _ in
+                // Last round's strokes must not bleed into this one's canvas.
+                appState.strokeSync.clear()
+            }
+        )
     }
 
     // MARK: - Waiting
@@ -147,13 +145,13 @@ struct DrawGameView: View {
     /// resizes to make room for both the inset and the keyboard, so both
     /// stay visible and readable at once.
     @ViewBuilder
-    private func playingView(_ round: RoundSnapshot) -> some View {
-        let isDrawer = round.drawerId == myPlayerId
+    private func playingView(_ round: RoundFlow<RoundSnapshot>.Round) -> some View {
+        let isDrawer = round.payload.drawerId == myPlayerId
 
         if isDrawer {
             VStack(spacing: 16) {
-                RoundHeaderView(roundNumber: round.roundIndex, totalRounds: totalRounds)
-                drawerBanner(word: round.word)
+                RoundHeaderView(roundNumber: round.index, totalRounds: totalRounds)
+                drawerBanner(word: round.payload.word)
                 DrawingCanvasView(isEditable: true, onStrokeBatch: sendStrokeBatch)
                 Spacer(minLength: 0)
             }
@@ -161,7 +159,7 @@ struct DrawGameView: View {
             .padding(.top, 12)
         } else {
             VStack(spacing: 16) {
-                RoundHeaderView(roundNumber: round.roundIndex, totalRounds: totalRounds)
+                RoundHeaderView(roundNumber: round.index, totalRounds: totalRounds)
                 DrawingCanvasView(
                     isEditable: false,
                     segments: appState.strokeSync.segments
@@ -172,7 +170,7 @@ struct DrawGameView: View {
             .padding(.top, 12)
             .safeAreaInset(edge: .bottom) {
                 GuessInputView(onSubmit: submitGuess)
-                    .id(round.roundIndex)
+                    .id(round.index)
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                     .padding(.bottom, 12)
@@ -225,55 +223,21 @@ struct DrawGameView: View {
         }
     }
 
-    // MARK: - Round Transitions
-
-    private func handleNewRound(_ payload: DrawPayload?) {
-        guard let payload else { return }
-        appState.strokeSync.clear()
-        let nextIndex = (roundQueue.last?.roundIndex ?? 0) + 1
-        roundQueue.append(RoundSnapshot(roundIndex: nextIndex, word: payload.word, drawerId: payload.drawerId))
-    }
-
-    private func presentReveal() {
-        guard let result = engine.lastRoundResult, !roundQueue.isEmpty else { return }
-        let completedRound = roundQueue.removeFirst()
-
-        revealAutoAdvanceTask?.cancel()
-        let isFinal = engine.finalScores != nil
-        revealSnapshot = RevealSnapshot(
-            round: completedRound,
-            result: result,
-            baselineScores: scoresBeforeReveal,
-            isFinal: isFinal
-        )
-        scoresBeforeReveal = Dictionary(uniqueKeysWithValues: result.scores.map { ($0.playerId, $0.score) })
-
-        guard !isFinal else { return }
-        revealAutoAdvanceTask = Task {
-            try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled else { return }
-            revealSnapshot = nil
-        }
-    }
-
     // MARK: - Types
 
+    /// The engine-side round payload, extracted from `currentRound` so a new
+    /// word/drawer pair is what `RoundFlow` treats as a new round.
     private struct DrawPayload: Equatable {
         let word: String
         let drawerId: UUID
     }
 
+    /// Speed Draw's per-round client state. Guesses aren't kept here — they
+    /// go straight to the engine, which alone decides when a guess ends the
+    /// round.
     private struct RoundSnapshot: Equatable {
-        let roundIndex: Int
         let word: String
         let drawerId: UUID
-    }
-
-    private struct RevealSnapshot {
-        let round: RoundSnapshot
-        let result: RoundResult
-        let baselineScores: [UUID: Int]
-        let isFinal: Bool
     }
 }
 

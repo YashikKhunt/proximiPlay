@@ -14,11 +14,12 @@ import UIKit
 /// Deliberately role-agnostic, following `TriviaGameView`'s pattern exactly:
 /// every branch below reads `appState.gameEngine` only, so host and joiner
 /// devices render identically, and role only matters for input routing via
-/// `AppState.submitPlayerInput(_:)`. Also mirrors Trivia's local
-/// `roundQueue`/`revealSnapshot` FIFO handling to stay correct even when the
-/// host's round loop advances `currentRound` in the same synchronous call
-/// that set `lastRoundResult` — see `TriviaGameView`'s doc comment for the
-/// full race-avoidance rationale.
+/// `AppState.submitPlayerInput(_:)`. Round sequencing — queueing each new
+/// prompt, pairing it with its own result, and the timed reveal in between —
+/// is the shared ``RoundFlow`` coordinator's job; see its doc comment for the
+/// full race-avoidance rationale. Vote Battle awards no points, so it simply
+/// ignores the per-round score baseline `RoundFlow` carries for the modes
+/// that do.
 ///
 /// ## Why there's no "N of M voted" progress
 ///
@@ -32,11 +33,7 @@ struct VoteGameView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
 
-    /// Rounds this device has seen start, oldest-first, awaiting their
-    /// reveal. In practice at most one or two entries deep.
-    @State private var roundQueue: [RoundSnapshot] = []
-    @State private var revealSnapshot: RevealSnapshot?
-    @State private var revealAutoAdvanceTask: Task<Void, Never>?
+    @State private var flow = RoundFlow<RoundSnapshot>()
 
     private var engine: GameEngine { appState.gameEngine }
 
@@ -52,27 +49,27 @@ struct VoteGameView: View {
 
     var body: some View {
         Group {
-            if let revealSnapshot {
+            if let reveal = flow.reveal {
                 VoteRevealView(
-                    roundNumber: revealSnapshot.round.roundIndex,
+                    roundNumber: reveal.round.index,
                     totalRounds: totalRounds,
-                    prompt: revealSnapshot.round.prompt,
-                    players: revealSnapshot.round.players,
-                    myVoteTargetId: revealSnapshot.round.myVoteTargetId,
+                    prompt: reveal.round.payload.prompt,
+                    players: reveal.round.payload.players,
+                    myVoteTargetId: reveal.round.payload.myVoteTargetId,
                     myPlayerId: appState.gameSessionManager.myPlayer.id,
-                    result: revealSnapshot.result,
-                    isFinalRound: revealSnapshot.isFinal
+                    result: reveal.result,
+                    isFinalRound: reveal.isFinal
                 ) {
                     router.navigate(to: .results)
                 }
-                .id(revealSnapshot.round.roundIndex)
-            } else if let current = roundQueue.last {
+                .id(reveal.round.index)
+            } else if let current = flow.current {
                 votingView(current)
             } else {
                 waitingView
             }
         }
-        .animation(.default, value: revealSnapshot != nil)
+        .animation(.default, value: flow.reveal != nil)
         .navigationTitle(GameMode.voteBattle.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -82,16 +79,19 @@ struct VoteGameView: View {
         }
         .hostLeftAlert()
         .leaveGameGuard()
-        .onChange(of: currentPrompt, initial: true) { _, newPrompt in
-            handleNewRound(newPrompt)
-        }
-        .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
-            guard newRoundNumber != nil else { return }
-            presentReveal()
-        }
-        .onDisappear {
-            revealAutoAdvanceTask?.cancel()
-        }
+        .roundFlow(
+            flow,
+            engine: engine,
+            roundTrigger: currentPrompt,
+            beginRound: { prompt, _ in
+                guard let prompt else { return nil }
+                return RoundSnapshot(
+                    prompt: prompt,
+                    players: appState.gameSessionManager.roster.players,
+                    myVoteTargetId: nil
+                )
+            }
+        )
     }
 
     // MARK: - Waiting
@@ -119,11 +119,13 @@ struct VoteGameView: View {
 
     // MARK: - Voting
 
-    private func votingView(_ round: RoundSnapshot) -> some View {
-        VStack(spacing: 20) {
-            RoundHeaderView(roundNumber: round.roundIndex, totalRounds: totalRounds)
+    private func votingView(_ round: RoundFlow<RoundSnapshot>.Round) -> some View {
+        let snapshot = round.payload
 
-            Text(round.prompt)
+        return VStack(spacing: 20) {
+            RoundHeaderView(roundNumber: round.index, totalRounds: totalRounds)
+
+            Text(snapshot.prompt)
                 .font(.title3.bold())
                 .foregroundStyle(Color.primary)
                 .multilineTextAlignment(.leading)
@@ -133,11 +135,11 @@ struct VoteGameView: View {
 
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 12)], spacing: 12) {
-                    ForEach(round.players) { player in
+                    ForEach(snapshot.players) { player in
                         VotePlayerCard(
                             player: player,
                             isMe: player.id == appState.gameSessionManager.myPlayer.id,
-                            state: cardState(for: player, in: round)
+                            state: cardState(for: player, in: snapshot)
                         ) {
                             selectTarget(player.id)
                         }
@@ -146,7 +148,7 @@ struct VoteGameView: View {
                 .padding(.vertical, 4)
             }
 
-            if round.myVoteTargetId != nil {
+            if snapshot.myVoteTargetId != nil {
                 HStack(spacing: 8) {
                     ProgressView()
                     Text("Vote in — waiting for others…")
@@ -169,60 +171,25 @@ struct VoteGameView: View {
     }
 
     private func selectTarget(_ playerId: UUID) {
-        guard !roundQueue.isEmpty, roundQueue[roundQueue.count - 1].myVoteTargetId == nil else { return }
+        guard let current = flow.current, current.payload.myVoteTargetId == nil else { return }
 
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
 
-        roundQueue[roundQueue.count - 1].myVoteTargetId = playerId
+        flow.updateCurrent { $0.myVoteTargetId = playerId }
         appState.submitPlayerInput(.vote(targetPlayerId: playerId))
-    }
-
-    // MARK: - Round Transitions
-
-    private func handleNewRound(_ prompt: String?) {
-        guard let prompt else { return }
-        let nextIndex = (roundQueue.last?.roundIndex ?? 0) + 1
-        roundQueue.append(
-            RoundSnapshot(
-                roundIndex: nextIndex,
-                prompt: prompt,
-                players: appState.gameSessionManager.roster.players,
-                myVoteTargetId: nil
-            )
-        )
-    }
-
-    private func presentReveal() {
-        guard let result = engine.lastRoundResult, !roundQueue.isEmpty else { return }
-        let completedRound = roundQueue.removeFirst()
-
-        revealAutoAdvanceTask?.cancel()
-        let isFinal = engine.finalScores != nil
-        revealSnapshot = RevealSnapshot(round: completedRound, result: result, isFinal: isFinal)
-
-        guard !isFinal else { return }
-        revealAutoAdvanceTask = Task {
-            try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled else { return }
-            revealSnapshot = nil
-        }
     }
 
     // MARK: - Types
 
+    /// Vote Battle's per-round client state: the prompt and the roster as
+    /// they were when the round started, plus this device's own vote once
+    /// cast.
     private struct RoundSnapshot: Equatable {
-        let roundIndex: Int
         let prompt: String
         let players: [Player]
         var myVoteTargetId: UUID?
-    }
-
-    private struct RevealSnapshot {
-        let round: RoundSnapshot
-        let result: RoundResult
-        let isFinal: Bool
     }
 }
 

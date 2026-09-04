@@ -12,12 +12,13 @@ import UIKit
 /// -> reveal -> next round, purely from `GameEngine`'s observable state.
 ///
 /// Follows `TriviaGameView`/`VoteGameView`/`DrawGameView`'s established
-/// pattern: a local FIFO `roundQueue`/`revealSnapshot` pair avoids the
-/// same-tick `currentRound` -> `lastRoundResult` race described in
-/// `TriviaGameView`'s doc comment, and every branch reads
+/// pattern: round sequencing lives in the shared ``RoundFlow`` coordinator,
+/// whose FIFO queue avoids the same-tick `currentRound` -> `lastRoundResult`
+/// race described in its doc comment, and every branch reads
 /// `appState.gameEngine` only, so host and joiner devices render
 /// identically. Role only ever changes *when* the flash timer starts (both
-/// still start it the moment they locally observe the round begin).
+/// still start it the moment they locally observe the round begin). The
+/// flash timing and the tap phase stay here — they are Reflex Tap's alone.
 ///
 /// ## Detecting a new round with no per-round payload
 ///
@@ -68,15 +69,7 @@ struct ReflexGameView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
 
-    /// Rounds this device has seen start, oldest-first, awaiting their
-    /// reveal. In practice at most one or two entries deep.
-    @State private var roundQueue: [RoundSnapshot] = []
-    @State private var revealSnapshot: RevealSnapshot?
-    @State private var revealAutoAdvanceTask: Task<Void, Never>?
-    /// Cumulative scores as of the most recently shown reveal -- the
-    /// baseline the *next* reveal diffs against to show per-round point
-    /// gains, and to detect whether the local player just won a round.
-    @State private var scoresBeforeReveal: [UUID: Int] = [:]
+    @State private var flow = RoundFlow<RoundSnapshot>()
 
     private var engine: GameEngine { appState.gameEngine }
     private var myPlayerId: UUID { appState.gameSessionManager.myPlayer.id }
@@ -94,33 +87,33 @@ struct ReflexGameView: View {
 
     var body: some View {
         Group {
-            if let revealSnapshot {
+            if let reveal = flow.reveal {
                 ReflexRoundResultView(
-                    roundNumber: revealSnapshot.round.roundIndex,
+                    roundNumber: reveal.round.index,
                     totalRounds: totalRounds,
                     myPlayerId: myPlayerId,
-                    result: revealSnapshot.result,
-                    previousScores: revealSnapshot.baselineScores,
-                    isFinalRound: revealSnapshot.isFinal
+                    result: reveal.result,
+                    previousScores: reveal.baselineScores,
+                    isFinalRound: reveal.isFinal
                 ) {
                     router.navigate(to: .results)
                 }
-            } else if let current = roundQueue.last {
+            } else if let current = flow.current {
                 ReflexPromptView(
-                    roundNumber: current.roundIndex,
+                    roundNumber: current.index,
                     totalRounds: totalRounds,
-                    phase: current.phase
+                    phase: current.payload.phase
                 ) {
-                    handleTap(roundIndex: current.roundIndex)
+                    handleTap(roundIndex: current.index)
                 }
-                .task(id: current.roundIndex) {
-                    await runFlashTimer(roundIndex: current.roundIndex, delay: current.flashDelay)
+                .task(id: current.index) {
+                    await runFlashTimer(roundIndex: current.index, delay: current.payload.flashDelay)
                 }
             } else {
                 waitingView
             }
         }
-        .animation(.default, value: revealSnapshot != nil)
+        .animation(.default, value: flow.reveal != nil)
         .navigationTitle(GameMode.reflexTap.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -130,16 +123,18 @@ struct ReflexGameView: View {
         }
         .hostLeftAlert()
         .leaveGameGuard()
-        .onChange(of: isRoundActive, initial: true) { _, isActive in
-            handleNewRound(isActive)
-        }
-        .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
-            guard newRoundNumber != nil else { return }
-            presentReveal()
-        }
-        .onDisappear {
-            revealAutoAdvanceTask?.cancel()
-        }
+        .roundFlow(
+            flow,
+            engine: engine,
+            roundTrigger: isRoundActive,
+            beginRound: { isActive, nextRoundIndex in
+                guard isActive else { return nil }
+                return RoundSnapshot(flashDelay: Self.flashDelay(forRound: nextRoundIndex))
+            },
+            onReveal: { reveal in
+                celebrateIfLocalPlayerWon(reveal)
+            }
+        )
     }
 
     // MARK: - Waiting (before the first round)
@@ -175,11 +170,11 @@ struct ReflexGameView: View {
     /// recorded (`.tooSoon`/`.lockedIn`), matching the engine's own
     /// first-wins rule for `.reflexTap`.
     private func handleTap(roundIndex: Int) {
-        guard let idx = roundQueue.firstIndex(where: { $0.roundIndex == roundIndex }) else { return }
-        guard roundQueue[idx].phase == .waiting || roundQueue[idx].phase == .flash else { return }
+        guard let phase = flow.payload(forRound: roundIndex)?.phase else { return }
+        guard phase == .waiting || phase == .flash else { return }
 
-        let wasEarly = roundQueue[idx].phase == .waiting
-        roundQueue[idx].phase = wasEarly ? .tooSoon : .lockedIn
+        let wasEarly = phase == .waiting
+        flow.update(round: roundIndex) { $0.phase = wasEarly ? .tooSoon : .lockedIn }
 
         #if canImport(UIKit)
         if wasEarly {
@@ -207,66 +202,38 @@ struct ReflexGameView: View {
             return
         }
         guard !Task.isCancelled else { return }
-        guard let idx = roundQueue.firstIndex(where: { $0.roundIndex == roundIndex }) else { return }
-        guard roundQueue[idx].phase == .waiting else { return }
+        guard flow.payload(forRound: roundIndex)?.phase == .waiting else { return }
 
-        roundQueue[idx].phase = .flash
+        flow.update(round: roundIndex) { $0.phase = .flash }
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         #endif
     }
 
-    // MARK: - Round Transitions
+    // MARK: - Reveal Feedback
 
-    private func handleNewRound(_ isActive: Bool) {
-        guard isActive else { return }
-        let nextIndex = (roundQueue.last?.roundIndex ?? 0) + 1
-        roundQueue.append(RoundSnapshot(roundIndex: nextIndex, flashDelay: Self.flashDelay(forRound: nextIndex)))
-    }
+    /// Fires a success haptic when the just-revealed round moved the local
+    /// player's score up -- Reflex Tap's own reaction to a reveal, using the
+    /// pre-result baseline `RoundFlow` hands back. (The reveal itself shows
+    /// per-round deltas for everyone; this is only the local celebration.)
+    private func celebrateIfLocalPlayerWon(_ reveal: RoundFlow<RoundSnapshot>.Reveal) {
+        let myPreviousScore = reveal.baselineScores[myPlayerId] ?? 0
+        let myNewScore = reveal.result.scores.first { $0.playerId == myPlayerId }?.score ?? myPreviousScore
+        guard myNewScore > myPreviousScore else { return }
 
-    private func presentReveal() {
-        guard let result = engine.lastRoundResult, !roundQueue.isEmpty else { return }
-        let completedRound = roundQueue.removeFirst()
-        let myPreviousScore = scoresBeforeReveal[myPlayerId] ?? 0
-        let myNewScore = result.scores.first { $0.playerId == myPlayerId }?.score ?? myPreviousScore
-
-        revealAutoAdvanceTask?.cancel()
-        let isFinal = engine.finalScores != nil
-        revealSnapshot = RevealSnapshot(
-            round: completedRound,
-            result: result,
-            baselineScores: scoresBeforeReveal,
-            isFinal: isFinal
-        )
-        scoresBeforeReveal = Dictionary(uniqueKeysWithValues: result.scores.map { ($0.playerId, $0.score) })
-
-        if myNewScore > myPreviousScore {
-            #if canImport(UIKit)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            #endif
-        }
-
-        guard !isFinal else { return }
-        revealAutoAdvanceTask = Task {
-            try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled else { return }
-            revealSnapshot = nil
-        }
+        #if canImport(UIKit)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        #endif
     }
 
     // MARK: - Types
 
+    /// Reflex Tap's per-round client state: this device's locally derived
+    /// flash moment and how far through the tap sequence it has got. Neither
+    /// is ever mirrored to the engine or the wire.
     private struct RoundSnapshot: Equatable {
-        let roundIndex: Int
         let flashDelay: TimeInterval
         var phase: TapPhase = .waiting
-    }
-
-    private struct RevealSnapshot {
-        let round: RoundSnapshot
-        let result: RoundResult
-        let baselineScores: [UUID: Int]
-        let isFinal: Bool
     }
 }
 

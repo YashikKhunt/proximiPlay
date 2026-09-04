@@ -53,6 +53,7 @@
 		CA37B12EE52015CFCEDDF459 /* VoteGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31724A54B4210942D56EEE8 /* VoteGameView.swift */; };
 		CC00000100000001AABBCC03 /* NicknameEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00000200000001AABBCC03 /* NicknameEditorView.swift */; };
 		D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36511A62C2A5483193C1F642 /* GameEngine.swift */; };
+		7C2D1B3A6F8E4D229BAC1E42 /* RoundFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F1C0A2B5E7D4C118A9B0D31 /* RoundFlow.swift */; };
 		EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183F02246B3748469E7AC70C /* ReflexGameView.swift */; };
 		EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E514E52689042D9980EB75F /* TriviaGameView.swift */; };
 /* End PBXBuildFile section */
@@ -83,6 +84,7 @@
 		2661225BD61D4218B970D3AA /* DrawWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawWords.swift; sourceTree = "<group>"; };
 		359B8E67520F47C9B88480CE /* GuessInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessInputView.swift; sourceTree = "<group>"; };
 		36511A62C2A5483193C1F642 /* GameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameEngine.swift; sourceTree = "<group>"; };
+		3F1C0A2B5E7D4C118A9B0D31 /* RoundFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundFlow.swift; sourceTree = "<group>"; };
 		4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteRevealView.swift; sourceTree = "<group>"; };
 		4743515830496C22001644A3 /* proximiPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = proximiPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4743515B30496C22001644A3 /* proximiPlayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = proximiPlayApp.swift; sourceTree = "<group>"; };
@@ -256,6 +258,7 @@
 				6ABAC638B58EA1F895F16A8A /* GameHostView.swift */,
 				36511A62C2A5483193C1F642 /* GameEngine.swift */,
 				2661225BD61D4218B970D3AA /* DrawWords.swift */,
+				3F1C0A2B5E7D4C118A9B0D31 /* RoundFlow.swift */,
 				4743518E30496E5A001644A3 /* ReflexTap */,
 				4743518D30496E55001644A3 /* SpeedDraw */,
 				4743518C30496E4F001644A3 /* VoteBattle */,
@@ -583,6 +586,7 @@
 				BB00000100000002AABBCC02 /* ContentPackLoader.swift in Sources */,
 				4D3AC1A00E3939890994760F /* GameHostView.swift in Sources */,
 				D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */,
+				7C2D1B3A6F8E4D229BAC1E42 /* RoundFlow.swift in Sources */,
 				EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */,
 				54D8F06C52974995B32DD276 /* TriviaRoundResultView.swift in Sources */,
 				6E1182C36D114409B4CABAD9 /* DrawWords.swift in Sources */,

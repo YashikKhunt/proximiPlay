@@ -17,31 +17,16 @@ import UIKit
 /// `AppState.submitPlayerInput(_:)` (host submits locally, joiner sends to
 /// the host peer).
 ///
-/// ## Why a local round queue instead of reading `engine` state directly
-///
-/// The host's round loop can advance `currentRound` → next round in the very
-/// same synchronous call that set `lastRoundResult` (no artificial delay
-/// between rounds in `GameEngine`), so a naïve "watch `currentRound`, watch
-/// `lastRoundResult`" pair of `onChange`s can race: by the time SwiftUI gets
-/// around to re-rendering, the engine may already be two states ahead. To
-/// stay correct regardless of that timing, this view treats round starts and
-/// round results as two independent, strictly-ordered FIFO streams —
-/// `roundQueue` (append on every new question) and the reveal it pops one
-/// entry from on every new result — rather than a single overwritable slot
-/// that could be clobbered mid-transition.
+/// Round sequencing — queueing each new question, pairing it with its own
+/// result, and the timed reveal in between — lives in the shared
+/// ``RoundFlow`` coordinator, which every mode view shares; see its doc
+/// comment for why round starts are a FIFO queue rather than a single slot.
+/// This view keeps only trivia's own rendering and answer handling.
 struct TriviaGameView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
 
-    /// Rounds this device has seen start, oldest-first, awaiting their
-    /// reveal. In practice at most one or two entries deep.
-    @State private var roundQueue: [RoundSnapshot] = []
-    @State private var revealSnapshot: RevealSnapshot?
-    @State private var revealAutoAdvanceTask: Task<Void, Never>?
-    /// Cumulative scores as of the most recently shown reveal — the
-    /// baseline the *next* reveal diffs against to show per-round point
-    /// gains. Empty before round 1 (everyone starts at 0).
-    @State private var scoresBeforeReveal: [UUID: Int] = [:]
+    @State private var flow = RoundFlow<RoundSnapshot>()
     @State private var currentRoundStartedAt: Date = .distantPast
 
     private var engine: GameEngine { appState.gameEngine }
@@ -62,28 +47,28 @@ struct TriviaGameView: View {
 
     var body: some View {
         Group {
-            if let revealSnapshot {
+            if let reveal = flow.reveal {
                 TriviaRoundResultView(
-                    roundNumber: revealSnapshot.round.roundIndex,
+                    roundNumber: reveal.round.index,
                     totalRounds: totalRounds,
-                    question: revealSnapshot.round.question,
-                    options: revealSnapshot.round.options,
-                    correctIndex: revealSnapshot.round.correctIndex,
-                    mySelectedIndex: revealSnapshot.round.mySelectedIndex,
+                    question: reveal.round.payload.question,
+                    options: reveal.round.payload.options,
+                    correctIndex: reveal.round.payload.correctIndex,
+                    mySelectedIndex: reveal.round.payload.mySelectedIndex,
                     myPlayerId: appState.gameSessionManager.myPlayer.id,
-                    result: revealSnapshot.result,
-                    previousScores: revealSnapshot.baselineScores,
-                    isFinalRound: revealSnapshot.isFinal
+                    result: reveal.result,
+                    previousScores: reveal.baselineScores,
+                    isFinalRound: reveal.isFinal
                 ) {
                     router.navigate(to: .results)
                 }
-            } else if let current = roundQueue.last {
+            } else if let current = flow.current {
                 answeringView(current)
             } else {
                 waitingView
             }
         }
-        .animation(.default, value: revealSnapshot != nil)
+        .animation(.default, value: flow.reveal != nil)
         .navigationTitle(GameMode.quickTrivia.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -93,16 +78,23 @@ struct TriviaGameView: View {
         }
         .hostLeftAlert()
         .leaveGameGuard()
-        .onChange(of: currentTriviaPayload, initial: true) { _, newPayload in
-            handleNewRound(newPayload)
-        }
-        .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
-            guard newRoundNumber != nil else { return }
-            presentReveal()
-        }
-        .onDisappear {
-            revealAutoAdvanceTask?.cancel()
-        }
+        .roundFlow(
+            flow,
+            engine: engine,
+            roundTrigger: currentTriviaPayload,
+            beginRound: { payload, _ in
+                guard let payload else { return nil }
+                return RoundSnapshot(
+                    question: payload.question,
+                    options: payload.options,
+                    correctIndex: payload.correctIndex,
+                    mySelectedIndex: nil
+                )
+            },
+            onRoundStart: { _ in
+                currentRoundStartedAt = Date()
+            }
+        )
     }
 
     // MARK: - Waiting
@@ -130,9 +122,11 @@ struct TriviaGameView: View {
 
     // MARK: - Answering
 
-    private func answeringView(_ round: RoundSnapshot) -> some View {
-        VStack(spacing: 20) {
-            RoundHeaderView(roundNumber: round.roundIndex, totalRounds: totalRounds)
+    private func answeringView(_ round: RoundFlow<RoundSnapshot>.Round) -> some View {
+        let snapshot = round.payload
+
+        return VStack(spacing: 20) {
+            RoundHeaderView(roundNumber: round.index, totalRounds: totalRounds)
 
             TimelineView(.periodic(from: currentRoundStartedAt, by: 1.0 / 20.0)) { context in
                 let elapsed = context.date.timeIntervalSince(currentRoundStartedAt)
@@ -142,7 +136,7 @@ struct TriviaGameView: View {
                     .accessibilityHidden(true)
             }
 
-            Text(round.question)
+            Text(snapshot.question)
                 .font(.title3.bold())
                 .foregroundStyle(Color.primary)
                 .multilineTextAlignment(.leading)
@@ -151,18 +145,18 @@ struct TriviaGameView: View {
                 .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(Array(round.options.enumerated()), id: \.offset) { index, option in
+                ForEach(Array(snapshot.options.enumerated()), id: \.offset) { index, option in
                     TriviaAnswerButton(
                         letter: Self.letter(for: index),
                         text: option,
-                        state: buttonState(for: index, in: round)
+                        state: buttonState(for: index, in: snapshot)
                     ) {
                         selectAnswer(index)
                     }
                 }
             }
 
-            if round.mySelectedIndex != nil {
+            if snapshot.mySelectedIndex != nil {
                 HStack(spacing: 8) {
                     ProgressView()
                     Text("Waiting for others…")
@@ -185,76 +179,33 @@ struct TriviaGameView: View {
     }
 
     private func selectAnswer(_ index: Int) {
-        guard !roundQueue.isEmpty, roundQueue[roundQueue.count - 1].mySelectedIndex == nil else { return }
+        guard let current = flow.current, current.payload.mySelectedIndex == nil else { return }
 
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
 
-        roundQueue[roundQueue.count - 1].mySelectedIndex = index
+        flow.updateCurrent { $0.mySelectedIndex = index }
         appState.submitPlayerInput(.triviaAnswer(index: index, timestamp: Date()))
-    }
-
-    // MARK: - Round Transitions
-
-    private func handleNewRound(_ payload: TriviaPayload?) {
-        guard let payload else { return }
-        currentRoundStartedAt = Date()
-        let nextIndex = (roundQueue.last?.roundIndex ?? 0) + 1
-        roundQueue.append(
-            RoundSnapshot(
-                roundIndex: nextIndex,
-                question: payload.question,
-                options: payload.options,
-                correctIndex: payload.correctIndex,
-                mySelectedIndex: nil
-            )
-        )
-    }
-
-    private func presentReveal() {
-        guard let result = engine.lastRoundResult, !roundQueue.isEmpty else { return }
-        let completedRound = roundQueue.removeFirst()
-
-        revealAutoAdvanceTask?.cancel()
-        let isFinal = engine.finalScores != nil
-        revealSnapshot = RevealSnapshot(
-            round: completedRound,
-            result: result,
-            baselineScores: scoresBeforeReveal,
-            isFinal: isFinal
-        )
-        scoresBeforeReveal = Dictionary(uniqueKeysWithValues: result.scores.map { ($0.playerId, $0.score) })
-
-        guard !isFinal else { return }
-        revealAutoAdvanceTask = Task {
-            try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled else { return }
-            revealSnapshot = nil
-        }
     }
 
     // MARK: - Types
 
+    /// The engine-side question payload, extracted from `currentRound` so a
+    /// *new* question is what `RoundFlow` treats as a new round.
     private struct TriviaPayload: Equatable {
         let question: String
         let options: [String]
         let correctIndex: Int
     }
 
+    /// Trivia's per-round client state: the question as shown, plus this
+    /// device's own answer once locked in.
     private struct RoundSnapshot: Equatable {
-        let roundIndex: Int
         let question: String
         let options: [String]
         let correctIndex: Int
         var mySelectedIndex: Int?
-    }
-
-    private struct RevealSnapshot {
-        let round: RoundSnapshot
-        let result: RoundResult
-        let baselineScores: [UUID: Int]
-        let isFinal: Bool
     }
 
     private static let letters = ["A", "B", "C", "D"]
