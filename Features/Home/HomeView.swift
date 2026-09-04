@@ -14,6 +14,11 @@ struct HomeView: View {
     /// root, not part of the host/join flow the navigation stack models.
     @State private var isEditingNickname = false
 
+    /// Presents `SettingsView`, for the same reason `NicknameEditorView`
+    /// does: sound/haptics preferences are a self-contained detour off the
+    /// root, not a destination in the host/join navigation flow.
+    @State private var isShowingSettings = false
+
     /// The name every nearby device will see. Read from the live
     /// `myPlayer` (kept in step with the persisted nickname by
     /// `GameSessionManager.updateNickname(_:)`), so returning from the
@@ -92,9 +97,27 @@ struct HomeView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isShowingSettings = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .accessibilityLabel("Settings")
+                .accessibilityHint("Adjust sound and haptics preferences")
+            }
+        }
         .sheet(isPresented: $isEditingNickname) {
             NavigationStack {
                 NicknameEditorView()
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $isShowingSettings) {
+            NavigationStack {
+                SettingsView()
             }
             .presentationDetents([.medium, .large])
         }

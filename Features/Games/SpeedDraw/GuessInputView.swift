@@ -87,9 +87,8 @@ struct GuessInputView: View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        HapticEngine.shared.play(.selection)
+        SoundPlayer.shared.play(.selection)
 
         onSubmit(trimmed)
 

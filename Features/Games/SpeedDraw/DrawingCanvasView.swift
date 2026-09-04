@@ -221,9 +221,12 @@ struct DrawingCanvasView: View {
                 currentStroke = []
                 currentStrokeRendered = []
                 sentPointCount = 0
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+                // Deliberately no haptic here: this fires on every
+                // finger-lift, i.e. dozens of times per round for anyone
+                // drawing in more than a couple of strokes — contrary to
+                // HIG's "discrete, meaningful events" guidance (flagged in
+                // `.planning/REVIEW.md`'s Low backlog). Clear/undo below are
+                // the actual discrete, deliberate actions worth a haptic.
             }
     }
 
@@ -252,9 +255,8 @@ struct DrawingCanvasView: View {
         currentStrokeRendered = []
         sentPointCount = 0
         onStrokeBatch?([])
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
+        HapticEngine.shared.play(.tapRegistered)
+        SoundPlayer.shared.play(.tapRegistered)
     }
 
     /// Removes the local player's most recent completed stroke, then
@@ -277,9 +279,8 @@ struct DrawingCanvasView: View {
         for stroke in strokes {
             onStrokeBatch?(stroke.points.map { CodablePoint($0) })
         }
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        HapticEngine.shared.play(.tapRegistered)
+        SoundPlayer.shared.play(.tapRegistered)
     }
 
     // MARK: - Types

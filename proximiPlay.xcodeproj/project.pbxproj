@@ -7,8 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		10116A2B78A44224BF7322EC /* winner_reveal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 8D2D0051C681490FB4E68DDE /* winner_reveal.wav */; };
 		1FEDB35824B747AC85B290AC /* DrawingCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */; };
+		233902AB062647249617B2DC /* player_joined.wav in Resources */ = {isa = PBXBuildFile; fileRef = DC95628EEA8A4B41B98CC0A5 /* player_joined.wav */; };
+		247DEBD8B46F47BD9CE53303 /* selection.wav in Resources */ = {isa = PBXBuildFile; fileRef = C4428BF055AE4EABA926644C /* selection.wav */; };
 		2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */; };
+		2C635E19708242549C4B84F6 /* tap_registered.wav in Resources */ = {isa = PBXBuildFile; fileRef = DBA840EC49E541FFB41B1D61 /* tap_registered.wav */; };
 		2DFA92476D8002D78A38A748 /* VoteRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */; };
 		2F259B499DBA10854D9C1010 /* LeaveGameGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 185BD9F05975EE07B96CA870 /* LeaveGameGuard.swift */; };
 		4743515C30496C22001644A3 /* proximiPlayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4743515B30496C22001644A3 /* proximiPlayApp.swift */; };
@@ -25,13 +29,20 @@
 		474351FB3049768C001644A3 /* ConnectionIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F53049768C001644A3 /* ConnectionIndicator.swift */; };
 		474351FC3049768C001644A3 /* PlayerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F63049768C001644A3 /* PlayerBadge.swift */; };
 		474351FD3049768C001644A3 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474351F73049768C001644A3 /* PrimaryButton.swift */; };
+		4A5C52AFF166461DA797D9BA /* FeedbackSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A316BE84FA44221AD6C79DF /* FeedbackSettings.swift */; };
 		4D3AC1A00E3939890994760F /* GameHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABAC638B58EA1F895F16A8A /* GameHostView.swift */; };
 		4F6EB5EFA19B0623E8F45BAD /* PlayerRoster.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7D9D9FD7382D9B8D6A48D9A /* PlayerRoster.swift */; };
 		54D8F06C52974995B32DD276 /* TriviaRoundResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */; };
 		5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359B8E67520F47C9B88480CE /* GuessInputView.swift */; };
 		6456B8C7ED367E9C70F0015C /* RoundHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0DEA13C7975C7E98D0E63C /* RoundHeaderView.swift */; };
+		65C7A9A59D23483B9F9B34C1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E84EC1F16A749F1913A2891 /* SettingsView.swift */; };
 		6E1182C36D114409B4CABAD9 /* DrawWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2661225BD61D4218B970D3AA /* DrawWords.swift */; };
 		7145E38DAB2741E9A0D23430 /* StrokeSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D61D4697375430B81F4993C /* StrokeSync.swift */; };
+		7C2D1B3A6F8E4D229BAC1E42 /* RoundFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F1C0A2B5E7D4C118A9B0D31 /* RoundFlow.swift */; };
+		7DA1A7D5F70148259222CD74 /* answer_correct.wav in Resources */ = {isa = PBXBuildFile; fileRef = 23DE352F116C4A549D1F3480 /* answer_correct.wav */; };
+		9A1B2C3D4E5F60718293A4B5 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F60718293A4B6 /* Motion.swift */; };
+		9AABC809D8EA48F39618F63B /* HapticEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDCF95C61DD54A34ADD5CDDA /* HapticEngine.swift */; };
+		A167FA2921F44396AFFFA71B /* SoundPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FAD055D8C14896A5A557BD /* SoundPlayer.swift */; };
 		AA00000100000001AABBCC01 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000001AABBCC01 /* Player.swift */; };
 		AA00000100000002AABBCC01 /* PlayerColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000002AABBCC01 /* PlayerColor.swift */; };
 		AA00000100000003AABBCC01 /* GameMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000003AABBCC01 /* GameMode.swift */; };
@@ -43,6 +54,7 @@
 		AA00000100000009AABBCC01 /* RoundResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000200000009AABBCC01 /* RoundResult.swift */; };
 		AA0000010000000AAABBCC01 /* PlayerScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000AAAABBCC01 /* PlayerScore.swift */; };
 		AA0000010000000BAABBCC01 /* CodablePoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000BBAABBCC01 /* CodablePoint.swift */; };
+		AA0E7F1939F14DF1A379BA44 /* answer_wrong.wav in Resources */ = {isa = PBXBuildFile; fileRef = 3EAB8EB96A3043BBB95BB88D /* answer_wrong.wav */; };
 		B034595888584DBBA8092386 /* DrawGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */; };
 		BB00000100000001AABBCC02 /* ContentPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000200000001AABBCC02 /* ContentPack.swift */; };
 		BB00000100000002AABBCC02 /* ContentPackLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000200000002AABBCC02 /* ContentPackLoader.swift */; };
@@ -53,7 +65,7 @@
 		CA37B12EE52015CFCEDDF459 /* VoteGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31724A54B4210942D56EEE8 /* VoteGameView.swift */; };
 		CC00000100000001AABBCC03 /* NicknameEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00000200000001AABBCC03 /* NicknameEditorView.swift */; };
 		D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36511A62C2A5483193C1F642 /* GameEngine.swift */; };
-		7C2D1B3A6F8E4D229BAC1E42 /* RoundFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F1C0A2B5E7D4C118A9B0D31 /* RoundFlow.swift */; };
+		E07DD4CBCBD14E998C042A04 /* round_start.wav in Resources */ = {isa = PBXBuildFile; fileRef = 387CB24D191943D8A195B629 /* round_start.wav */; };
 		EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183F02246B3748469E7AC70C /* ReflexGameView.swift */; };
 		EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E514E52689042D9980EB75F /* TriviaGameView.swift */; };
 /* End PBXBuildFile section */
@@ -78,12 +90,16 @@
 /* Begin PBXFileReference section */
 		0D0DEA13C7975C7E98D0E63C /* RoundHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundHeaderView.swift; sourceTree = "<group>"; };
 		0E514E52689042D9980EB75F /* TriviaGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaGameView.swift; sourceTree = "<group>"; };
+		14FAD055D8C14896A5A557BD /* SoundPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundPlayer.swift; sourceTree = "<group>"; };
 		183F02246B3748469E7AC70C /* ReflexGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReflexGameView.swift; sourceTree = "<group>"; };
 		185BD9F05975EE07B96CA870 /* LeaveGameGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaveGameGuard.swift; sourceTree = "<group>"; };
 		1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
+		23DE352F116C4A549D1F3480 /* answer_correct.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = answer_correct.wav; sourceTree = "<group>"; };
 		2661225BD61D4218B970D3AA /* DrawWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawWords.swift; sourceTree = "<group>"; };
 		359B8E67520F47C9B88480CE /* GuessInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessInputView.swift; sourceTree = "<group>"; };
 		36511A62C2A5483193C1F642 /* GameEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameEngine.swift; sourceTree = "<group>"; };
+		387CB24D191943D8A195B629 /* round_start.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = round_start.wav; sourceTree = "<group>"; };
+		3EAB8EB96A3043BBB95BB88D /* answer_wrong.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = answer_wrong.wav; sourceTree = "<group>"; };
 		3F1C0A2B5E7D4C118A9B0D31 /* RoundFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoundFlow.swift; sourceTree = "<group>"; };
 		4296A9B5A912449A59D52EA3 /* VoteRevealView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteRevealView.swift; sourceTree = "<group>"; };
 		4743515830496C22001644A3 /* proximiPlay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = proximiPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -105,8 +121,12 @@
 		474351F73049768C001644A3 /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimaryButton.swift; sourceTree = "<group>"; };
 		6ABAC638B58EA1F895F16A8A /* GameHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHostView.swift; sourceTree = "<group>"; };
 		78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaRoundResultView.swift; sourceTree = "<group>"; };
+		7E84EC1F16A749F1913A2891 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		84EFDD1C8CFB48B1BCB6A744 /* DrawGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawGameView.swift; sourceTree = "<group>"; };
+		8A316BE84FA44221AD6C79DF /* FeedbackSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSettings.swift; sourceTree = "<group>"; };
+		8D2D0051C681490FB4E68DDE /* winner_reveal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = winner_reveal.wav; sourceTree = "<group>"; };
 		8D61D4697375430B81F4993C /* StrokeSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeSync.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F60718293A4B6 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		AA00000200000001AABBCC01 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		AA00000200000002AABBCC01 /* PlayerColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerColor.swift; sourceTree = "<group>"; };
 		AA00000200000003AABBCC01 /* GameMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMode.swift; sourceTree = "<group>"; };
@@ -124,9 +144,13 @@
 		BB00000200000004AABBCC02 /* popculture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = popculture.json; sourceTree = "<group>"; };
 		BB00000200000005AABBCC02 /* mostlikely.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = mostlikely.json; sourceTree = "<group>"; };
 		BB00000200000006AABBCC02 /* wouldyourather.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = wouldyourather.json; sourceTree = "<group>"; };
+		C4428BF055AE4EABA926644C /* selection.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = selection.wav; sourceTree = "<group>"; };
 		C7D9D9FD7382D9B8D6A48D9A /* PlayerRoster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerRoster.swift; sourceTree = "<group>"; };
 		CC00000200000001AABBCC03 /* NicknameEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NicknameEditorView.swift; sourceTree = "<group>"; };
 		D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingCanvasView.swift; sourceTree = "<group>"; };
+		DBA840EC49E541FFB41B1D61 /* tap_registered.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = tap_registered.wav; sourceTree = "<group>"; };
+		DC95628EEA8A4B41B98CC0A5 /* player_joined.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = player_joined.wav; sourceTree = "<group>"; };
+		DDCF95C61DD54A34ADD5CDDA /* HapticEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticEngine.swift; sourceTree = "<group>"; };
 		F31724A54B4210942D56EEE8 /* VoteGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteGameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -186,6 +210,30 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		00A5220633984BEDB1873339 /* Feedback */ = {
+			isa = PBXGroup;
+			children = (
+				DDCF95C61DD54A34ADD5CDDA /* HapticEngine.swift */,
+				14FAD055D8C14896A5A557BD /* SoundPlayer.swift */,
+				8A316BE84FA44221AD6C79DF /* FeedbackSettings.swift */,
+			);
+			path = Feedback;
+			sourceTree = "<group>";
+		};
+		02F1387DB4C64C74A36146EB /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				C4428BF055AE4EABA926644C /* selection.wav */,
+				DBA840EC49E541FFB41B1D61 /* tap_registered.wav */,
+				387CB24D191943D8A195B629 /* round_start.wav */,
+				23DE352F116C4A549D1F3480 /* answer_correct.wav */,
+				3EAB8EB96A3043BBB95BB88D /* answer_wrong.wav */,
+				8D2D0051C681490FB4E68DDE /* winner_reveal.wav */,
+				DC95628EEA8A4B41B98CC0A5 /* player_joined.wav */,
+			);
+			path = Sounds;
+			sourceTree = "<group>";
+		};
 		4743514F30496C22001644A3 = {
 			isa = PBXGroup;
 			children = (
@@ -230,6 +278,7 @@
 				4743518A30496E3F001644A3 /* Games */,
 				4743518930496E38001644A3 /* Lobby */,
 				4743518830496E2C001644A3 /* Home */,
+				B70DC1D3F5244B719BA01E29 /* Settings */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -356,6 +405,7 @@
 			children = (
 				4743519530496EB7001644A3 /* Extensions */,
 				4743519430496EB1001644A3 /* Components */,
+				00A5220633984BEDB1873339 /* Feedback */,
 				BB00000200000002AABBCC02 /* ContentPackLoader.swift */,
 			);
 			path = Shared;
@@ -376,6 +426,7 @@
 		4743519530496EB7001644A3 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
+				9A1B2C3D4E5F60718293A4B6 /* Motion.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -385,6 +436,7 @@
 			children = (
 				4743519830496ECD001644A3 /* PromptPacks */,
 				4743519730496EC2001644A3 /* QuestionPacks */,
+				02F1387DB4C64C74A36146EB /* Sounds */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -405,6 +457,14 @@
 				BB00000200000006AABBCC02 /* wouldyourather.json */,
 			);
 			path = PromptPacks;
+			sourceTree = "<group>";
+		};
+		B70DC1D3F5244B719BA01E29 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				7E84EC1F16A749F1913A2891 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -531,6 +591,13 @@
 				BB00000100000004AABBCC02 /* popculture.json in Resources */,
 				BB00000100000005AABBCC02 /* mostlikely.json in Resources */,
 				BB00000100000006AABBCC02 /* wouldyourather.json in Resources */,
+				247DEBD8B46F47BD9CE53303 /* selection.wav in Resources */,
+				2C635E19708242549C4B84F6 /* tap_registered.wav in Resources */,
+				E07DD4CBCBD14E998C042A04 /* round_start.wav in Resources */,
+				7DA1A7D5F70148259222CD74 /* answer_correct.wav in Resources */,
+				AA0E7F1939F14DF1A379BA44 /* answer_wrong.wav in Resources */,
+				10116A2B78A44224BF7322EC /* winner_reveal.wav in Resources */,
+				233902AB062647249617B2DC /* player_joined.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -600,6 +667,11 @@
 				2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */,
 				6456B8C7ED367E9C70F0015C /* RoundHeaderView.swift in Sources */,
 				2F259B499DBA10854D9C1010 /* LeaveGameGuard.swift in Sources */,
+				9A1B2C3D4E5F60718293A4B5 /* Motion.swift in Sources */,
+				4A5C52AFF166461DA797D9BA /* FeedbackSettings.swift in Sources */,
+				9AABC809D8EA48F39618F63B /* HapticEngine.swift in Sources */,
+				A167FA2921F44396AFFFA71B /* SoundPlayer.swift in Sources */,
+				65C7A9A59D23483B9F9B34C1 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

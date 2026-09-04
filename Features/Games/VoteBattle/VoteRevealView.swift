@@ -45,6 +45,8 @@ struct VoteRevealView: View {
     /// row's scale/opacity transition.
     @State private var revealedIds: Set<UUID> = []
 
+    @Environment(\.motionReduceMotion) private var reduceMotion
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -175,10 +177,14 @@ struct VoteRevealView: View {
         }
         .scaleEffect(revealed ? 1.0 : 0.85)
         .opacity(revealed ? 1.0 : 0.0)
-        .animation(
-            .spring(response: 0.4, dampingFraction: 0.65).delay(Double(index) * 0.08),
-            value: revealed
-        )
+        // Shared card-reveal vocabulary with `TriviaRoundResultView`'s
+        // standings: the same arrival spring, staggered per row by
+        // `Motion.staggerDelay`. `.motion(_:value:)` alone already collapses
+        // to an instant cut under Reduce Motion regardless of this delay —
+        // it's threaded through anyway so the *scheduling* in
+        // `animateReveal()` below and the *animation curve* here agree,
+        // rather than one silently assuming the other already handled it.
+        .motion(Motion.arrival.delay(Motion.staggerDelay(index: index, reduceMotion: reduceMotion)), value: revealed)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             rowAccessibilityLabel(player: player, isWinner: isWinner, isMyVote: isMyVote, isMe: isMe, votes: votes)
@@ -202,17 +208,33 @@ struct VoteRevealView: View {
 
     // MARK: - Reveal Animation
 
+    /// Staggers each row's spring-in by join order under normal motion. The
+    /// two Reduce Motion requirements this satisfies at once: the reveal
+    /// itself never plays (nothing moves), and — the more dangerous
+    /// failure mode — every row is visible immediately rather than only
+    /// arriving once a `Task.sleep` for its slot elapses. `revealedIds` is
+    /// populated synchronously in that branch, not via a zero-delay `Task`,
+    /// so there is no dependency on a runloop turn actually happening
+    /// before the content counts as "shown."
     private func animateReveal() {
+        guard !reduceMotion else {
+            revealedIds = Set(players.map(\.id))
+            if result.highlightPlayerId != nil {
+                HapticEngine.shared.play(.winnerReveal)
+                SoundPlayer.shared.play(.winnerReveal)
+            }
+            return
+        }
+
         for (index, player) in players.enumerated() {
-            let delay = Double(index) * 0.08
+            let delay = Motion.staggerDelay(index: index, reduceMotion: reduceMotion)
             Task {
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled else { return }
                 revealedIds.insert(player.id)
                 if player.id == result.highlightPlayerId {
-                    #if canImport(UIKit)
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    #endif
+                    HapticEngine.shared.play(.winnerReveal)
+                    SoundPlayer.shared.play(.winnerReveal)
                 }
             }
         }
@@ -351,5 +373,21 @@ private extension VoteRevealView {
         isFinalRound: false
     )
     .dynamicTypeSize(.accessibility3)
+}
+
+/// Confirms every row is fully visible immediately — no waiting on the
+/// staggered spring `animateReveal()` skips under Reduce Motion.
+#Preview("Reduce Motion") {
+    VoteRevealView(
+        roundNumber: 2,
+        totalRounds: 5,
+        prompt: VoteRevealView.samplePrompt,
+        players: VoteRevealView.samplePlayers,
+        myVoteTargetId: VoteRevealView.playerB.id,
+        myPlayerId: VoteRevealView.playerA.id,
+        result: VoteRevealView.sampleResult,
+        isFinalRound: false
+    )
+    .environment(\.motionReduceMotion, true)
 }
 #endif

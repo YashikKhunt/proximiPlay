@@ -4,17 +4,16 @@
 //
 
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 /// A full-width capsule-shaped primary action button with haptic feedback.
 ///
 /// Use this for the main call-to-action on any screen (e.g., "Start Game",
-/// "Join Game"). The button automatically delivers medium-impact haptic
-/// feedback on tap via `UIImpactFeedbackGenerator` on iOS. It adapts to
-/// Dynamic Type and respects the system's reduced-motion and increased-contrast
-/// preferences through the `.borderedProminent` button style.
+/// "Join Game"). The button delivers `HapticEngine`'s `.tapRegistered`
+/// feedback on tap — the same named event every other generic "an action was
+/// registered" tap in the app uses, so this doesn't grade differently from,
+/// say, a reflex tap. It adapts to Dynamic Type and respects the system's
+/// reduced-motion and increased-contrast preferences through the
+/// `.borderedProminent` button style.
 ///
 /// ```swift
 /// PrimaryButton("Start Game", systemImage: "play.fill") {
@@ -41,7 +40,8 @@ struct PrimaryButton: View {
 
     var body: some View {
         Button {
-            triggerHaptic()
+            HapticEngine.shared.play(.tapRegistered)
+            SoundPlayer.shared.play(.tapRegistered)
             action()
         } label: {
             HStack(spacing: 8) {
@@ -64,15 +64,6 @@ struct PrimaryButton: View {
         .opacity(isDisabled ? 0.5 : 1.0)
         .accessibilityLabel(title)
         .accessibilityAddTraits(isDisabled ? .isStaticText : [])
-    }
-
-    // MARK: - Private
-
-    private func triggerHaptic() {
-        #if canImport(UIKit)
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        #endif
     }
 }
 

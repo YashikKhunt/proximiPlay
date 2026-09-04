@@ -11,6 +11,10 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
 
+    /// SwiftUI's own Reduce Motion key — reactive, but read-only, so it
+    /// can't be overridden in a `#Preview`.
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
     var body: some View {
         @Bindable var router = router
         NavigationStack(path: $router.path) {
@@ -42,6 +46,16 @@ struct ContentView: View {
             router.popToRoot()
             router.navigate(to: .lobby)
         }
+        // Drive the writable `motionReduceMotion` mirror from SwiftUI's real
+        // key. `ReduceMotionKey.defaultValue` reads
+        // `UIAccessibility.isReduceMotionEnabled` directly, which SwiftUI does
+        // NOT observe — so without this bridge, toggling Reduce Motion while
+        // the app is running would leave already-rendered views animating
+        // until something else happened to invalidate them. Injecting the
+        // reactive key here makes the mirror update live, while a deeper
+        // `.environment(\.motionReduceMotion, true)` in a `#Preview` still
+        // wins for that subtree.
+        .environment(\.motionReduceMotion, systemReduceMotion)
     }
 }
 

@@ -54,6 +54,7 @@ struct ResultsView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.motionReduceMotion) private var reduceMotion
 
     /// Guards `persistIfNeeded()` against re-entry (e.g. a second
     /// `onAppear` from a SwiftUI re-render) so at most one `GameHistory`
@@ -112,13 +113,27 @@ struct ResultsView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Image(systemName: isVoteBattle ? "party.popper.fill" : "trophy.fill")
-                .font(.system(size: 56))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.yellow)
-                .scaleEffect(animateReveal ? 1.0 : 0.6)
-                .opacity(animateReveal ? 1.0 : 0.0)
-                .accessibilityHidden(true)
+            ZStack {
+                // Purely decorative flourish behind the trophy — skipped
+                // entirely under Reduce Motion rather than shown as a
+                // static, frozen scatter of sparkles (which would just read
+                // as clutter with no motion to justify it). The trophy +
+                // "Final Results" text alone already fully communicate the
+                // win either way, so nothing here ever gates visible
+                // information.
+                if !reduceMotion && !isVoteBattle {
+                    ConfettiBurst()
+                }
+
+                Image(systemName: isVoteBattle ? "party.popper.fill" : "trophy.fill")
+                    .font(.system(size: 56))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.yellow)
+                    .scaleEffect(animateReveal ? 1.0 : 0.6)
+                    .opacity(animateReveal ? 1.0 : 0.0)
+                    .motionEffect(reduceMotion: reduceMotion) { $0.symbolEffect(.bounce, value: animateReveal) }
+                    .accessibilityHidden(true)
+            }
 
             Text(mode?.displayName ?? "Game")
                 .font(.headline)
@@ -184,10 +199,14 @@ struct ResultsView: View {
 
             Spacer(minLength: 0)
 
-            Text("\(score.score)")
-                .font(.title3.weight(.bold))
-                .monospacedDigit()
-                .foregroundStyle(isWinner ? Color.yellow : Color.primary)
+            // The emotional peak of the app — every score counts up rather
+            // than snapping into place. See `AnimatedScoreText`.
+            AnimatedScoreText(
+                value: score.score,
+                from: 0,
+                font: .title3.weight(.bold),
+                color: isWinner ? Color.yellow : Color.primary
+            )
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
@@ -199,7 +218,16 @@ struct ResultsView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(isWinner ? Color.yellow : .clear, lineWidth: 2)
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.65), value: animateReveal)
+        // The winner's row gets the bouncier `Motion.celebration` spring —
+        // everyone else gets the standard `Motion.arrival` — both staggered
+        // by rank so standings cascade in rather than arriving as one
+        // block. `.motion(_:value:)` collapses either preset to an instant,
+        // fully-visible cut under Reduce Motion.
+        .motion(
+            (isWinner ? Motion.celebration : Motion.arrival)
+                .delay(Motion.staggerDelay(index: rank - 1, reduceMotion: reduceMotion)),
+            value: animateReveal
+        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(score.displayName)\(isMe ? ", you" : ""), rank \(rank)"
@@ -224,14 +252,14 @@ struct ResultsView: View {
                 .foregroundStyle(Color.secondary)
 
             VStack(spacing: 8) {
-                ForEach(finalScores) { score in
-                    voteBattleRow(for: score)
+                ForEach(Array(finalScores.enumerated()), id: \.element.id) { index, score in
+                    voteBattleRow(for: score, index: index)
                 }
             }
         }
     }
 
-    private func voteBattleRow(for score: PlayerScore) -> some View {
+    private func voteBattleRow(for score: PlayerScore, index: Int) -> some View {
         let lastRound = engine.lastRoundResult
         let isFanFavorite = lastRound?.highlightPlayerId == score.playerId
         let isMe = score.playerId == sessionManager.myPlayer.id
@@ -286,7 +314,11 @@ struct ResultsView: View {
             isFanFavorite ? Color.yellow.opacity(0.15) : Color(uiColor: .secondarySystemBackground),
             in: RoundedRectangle(cornerRadius: 16)
         )
-        .animation(.spring(response: 0.5, dampingFraction: 0.65), value: animateReveal)
+        .motion(
+            (isFanFavorite ? Motion.celebration : Motion.arrival)
+                .delay(Motion.staggerDelay(index: index, reduceMotion: reduceMotion)),
+            value: animateReveal
+        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(score.displayName)\(isMe ? ", you" : "")\(isFanFavorite ? ", last round favorite" : "")"
@@ -404,13 +436,17 @@ struct ResultsView: View {
 
     // MARK: - Celebration
 
+    /// Flips `animateReveal`, which every crown/trophy/row reveal above
+    /// keys off. Routed through `Motion.withAnimation` rather than the raw
+    /// `withAnimation(_:)` this used to call directly — under Reduce Motion
+    /// `animateReveal` still flips to `true` (every row still becomes fully
+    /// visible), the transaction just isn't animated.
     private func triggerCelebration() {
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) {
+        Motion.withAnimation(Motion.celebration, reduceMotion: reduceMotion) {
             animateReveal = true
         }
-        #if canImport(UIKit)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        #endif
+        HapticEngine.shared.play(.winnerReveal)
+        SoundPlayer.shared.play(.winnerReveal)
     }
 
     // MARK: - Persistence
@@ -487,6 +523,87 @@ struct ResultsView: View {
         let displayName: String
         let score: Int
         var id: UUID { playerId }
+    }
+}
+
+// MARK: - Animated Score Text
+
+/// Rolls a running total from `from` up to `value` using
+/// `.contentTransition(.numericText())` — the modern, declarative way to
+/// "count up" a number — rather than a hand-rolled `Timer`/`Task.sleep`
+/// loop stepping through intermediate integers.
+///
+/// Under Reduce Motion the count still lands on `value`, it just does so as
+/// a single non-animated update — see `Motion.withAnimation`.
+private struct AnimatedScoreText: View {
+    let value: Int
+    let from: Int
+    var suffix: String = ""
+    var font: Font = .title3.weight(.bold)
+    var color: Color = .primary
+
+    @State private var displayedValue: Int
+    @Environment(\.motionReduceMotion) private var reduceMotion
+
+    init(value: Int, from: Int, suffix: String = "", font: Font = .title3.weight(.bold), color: Color = .primary) {
+        self.value = value
+        self.from = from
+        self.suffix = suffix
+        self.font = font
+        self.color = color
+        _displayedValue = State(initialValue: from)
+    }
+
+    var body: some View {
+        Text("\(displayedValue)\(suffix)")
+            .font(font)
+            .monospacedDigit()
+            .foregroundStyle(color)
+            .contentTransition(.numericText())
+            .onAppear {
+                Motion.withAnimation(Motion.emphasis, reduceMotion: reduceMotion) {
+                    displayedValue = value
+                }
+            }
+    }
+}
+
+// MARK: - Confetti Burst
+
+/// A brief, decorative scatter of sparkles behind the header trophy —
+/// purely celebratory flourish, never how the win itself is communicated
+/// (that's the trophy image and "Final Results" text, both always present).
+/// Callers gate this out entirely under Reduce Motion rather than render it
+/// as a frozen, non-animating scatter — see `header`.
+private struct ConfettiBurst: View {
+    @State private var animate = false
+
+    private static let symbols = ["star.fill", "sparkle", "star.fill", "sparkle", "star.fill", "sparkle"]
+    private static let colors: [Color] = [.yellow, .orange, .pink, .indigo, .green, .blue]
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<Self.symbols.count, id: \.self) { index in
+                Image(systemName: Self.symbols[index])
+                    .font(.system(size: 14))
+                    .foregroundStyle(Self.colors[index % Self.colors.count])
+                    .offset(offset(for: index))
+                    .opacity(animate ? 0 : 1)
+                    .scaleEffect(animate ? 1.2 : 0.4)
+            }
+        }
+        .accessibilityHidden(true)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.9)) {
+                animate = true
+            }
+        }
+    }
+
+    private func offset(for index: Int) -> CGSize {
+        let angle = Double(index) / Double(Self.symbols.count) * 2 * .pi
+        let radius: CGFloat = animate ? 70 : 0
+        return CGSize(width: cos(angle) * radius, height: sin(angle) * radius)
     }
 }
 
@@ -634,5 +751,27 @@ private let previewVoteScores = previewPlayers.map {
     .environment(Router())
     .modelContainer(for: [GameHistory.self, PlayerStats.self], inMemory: true)
     .dynamicTypeSize(.accessibility3)
+}
+
+/// Confirms the winner's trophy, crown, and every standing (with its final
+/// score already in place) are fully visible immediately — no confetti, no
+/// symbol bounce, no staggered spring, and critically no score left sitting
+/// at its `AnimatedScoreText` starting value waiting on a count-up that
+/// never runs.
+#Preview("Reduce Motion") {
+    NavigationStack {
+        ResultsView()
+    }
+    .environment(
+        resultsPreviewAppState(
+            mode: .quickTrivia,
+            isHost: true,
+            scores: previewTriviaScores,
+            players: previewPlayers
+        )
+    )
+    .environment(Router())
+    .modelContainer(for: [GameHistory.self, PlayerStats.self], inMemory: true)
+    .environment(\.motionReduceMotion, true)
 }
 #endif

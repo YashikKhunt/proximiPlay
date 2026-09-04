@@ -9,6 +9,7 @@ import MultipeerConnectivity
 struct LobbyView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
+    @Environment(\.motionReduceMotion) private var reduceMotion
 
     /// Host-only local selection — never synced live to joiners (see
     /// `startGame()` doc comment for why). Defaults to the first mode.
@@ -72,10 +73,12 @@ struct LobbyView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.secondary)
                         .accessibilityLabel("No other players connected yet")
+                        .transition(playerRowTransition)
                 } else {
                     ForEach(otherPlayers) { player in
                         PlayerBadge(player: player, peerHealth: appState.peerHealth(for: player))
                             .padding(.vertical, 4)
+                            .transition(playerRowTransition)
                     }
                 }
             } header: {
@@ -147,6 +150,16 @@ struct LobbyView: View {
                 }
             }
         }
+        // Players popping straight into (and out of) the list read as a
+        // glitch, not a join — animate the roster's own arrivals/departures
+        // with the app's standard arrival spring, keyed off the roster
+        // itself (an `Equatable` `[Player]`, since `Player: Hashable`) so
+        // only an actual join/leave/reorder triggers it, not every
+        // unrelated re-render. See `playerRowTransition` for the per-row
+        // half of this (`.animation` alone only covers layout — a row still
+        // needs a `.transition` to know how to enter/exit rather than
+        // simply popping).
+        .motion(Motion.arrival, value: sessionManager.roster.players)
         .navigationTitle("Game Lobby")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
@@ -206,6 +219,27 @@ struct LobbyView: View {
             appState.currentGameState = .playing(newMode)
             router.navigate(to: .game(newMode))
         }
+    }
+
+    // MARK: - Player Row Motion
+
+    /// A joining player slides in from the trailing edge while fading in; a
+    /// leaving one just fades — matching how the row it's about to become
+    /// (or just was) is laid out, rather than the same motion in both
+    /// directions.
+    ///
+    /// `.identity` under Reduce Motion: the row still appears/disappears
+    /// exactly when the roster changes (nothing is ever skipped or hidden),
+    /// it just does so as a single instantaneous cut instead of a slide —
+    /// the same "instant, not invisible" contract every other reduce-motion
+    /// branch in this pass follows.
+    private var playerRowTransition: AnyTransition {
+        reduceMotion
+            ? .identity
+            : .asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .opacity
+            )
     }
 
     // MARK: - Actions
@@ -298,12 +332,53 @@ private struct GameModeCard: View {
 
 // MARK: - Previews
 
+#if DEBUG
+/// Seeds a host `AppState` with a couple of already-joined players via
+/// `PlayerRoster.applyLobbyUpdate(_:)` — the same joiner-side mutation path
+/// `GameSessionManager` uses, so no `MCPeerID` (host-only `hostPlayerJoined`
+/// needs one) is required just to populate a preview.
+@MainActor
+private func lobbyPreviewAppState() -> AppState {
+    let appState = AppState()
+    let host = Player(displayName: "Ari", color: .blue, isHost: true)
+    let joiner = Player(displayName: "Priyanka Chandrasekaran", color: .green)
+
+    appState.gameSessionManager.isHost = true
+    appState.gameSessionManager.myPlayer = host
+    appState.gameSessionManager.roster.setHost(host)
+    appState.gameSessionManager.roster.applyLobbyUpdate([host, joiner])
+
+    return appState
+}
+#endif
+
 #Preview("Host – Empty") {
     NavigationStack {
         LobbyView()
     }
     .environment(AppState())
     .environment(Router())
+}
+
+#Preview("Host – Players Joined") {
+    NavigationStack {
+        LobbyView()
+    }
+    .environment(lobbyPreviewAppState())
+    .environment(Router())
+}
+
+/// Reduce Motion: the same joined roster as above, so the check isn't
+/// "does the empty state look fine" — it confirms every already-connected
+/// player is fully visible immediately, with no reliance on the
+/// join/leave slide `playerRowTransition` no longer plays.
+#Preview("Reduce Motion") {
+    NavigationStack {
+        LobbyView()
+    }
+    .environment(lobbyPreviewAppState())
+    .environment(Router())
+    .environment(\.motionReduceMotion, true)
 }
 
 #Preview("Dark") {

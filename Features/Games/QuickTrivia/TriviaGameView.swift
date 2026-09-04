@@ -4,9 +4,6 @@
 //
 
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 /// Renders one Quick Trivia game end-to-end: question → answer → reveal →
 /// next round, purely from `GameEngine`'s observable state.
@@ -181,9 +178,8 @@ struct TriviaGameView: View {
     private func selectAnswer(_ index: Int) {
         guard let current = flow.current, current.payload.mySelectedIndex == nil else { return }
 
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
+        HapticEngine.shared.play(.selection)
+        SoundPlayer.shared.play(.selection)
 
         flow.updateCurrent { $0.mySelectedIndex = index }
         appState.submitPlayerInput(.triviaAnswer(index: index, timestamp: Date()))

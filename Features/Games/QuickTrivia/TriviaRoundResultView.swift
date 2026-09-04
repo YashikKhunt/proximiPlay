@@ -34,6 +34,14 @@ struct TriviaRoundResultView: View {
     /// Unused (and not shown) on non-final rounds, which auto-advance.
     var onContinue: (() -> Void)?
 
+    /// Player ids that have finished their staggered spring-in — the same
+    /// card-reveal vocabulary `VoteRevealView`'s results use, so the two
+    /// interstitials that share this "answer revealed, then standings roll
+    /// in" shape actually feel like the same app.
+    @State private var revealedIds: Set<UUID> = []
+
+    @Environment(\.motionReduceMotion) private var reduceMotion
+
     private var rankedScores: [RankedScore] {
         result.scores
             .map { score in
@@ -66,6 +74,7 @@ struct TriviaRoundResultView: View {
             .padding(20)
         }
         .accessibilityElement(children: .contain)
+        .onAppear { animateReveal() }
     }
 
     // MARK: - Answer Reveal
@@ -150,6 +159,7 @@ struct TriviaRoundResultView: View {
     private func standingRow(rank: Int, score: RankedScore) -> some View {
         let isTopScorer = result.highlightPlayerId == score.playerId && score.delta > 0
         let isMe = score.playerId == myPlayerId
+        let revealed = revealedIds.contains(score.playerId)
 
         return HStack(spacing: 12) {
             Text("\(rank)")
@@ -169,9 +179,17 @@ struct TriviaRoundResultView: View {
                             .accessibilityHidden(true)
                     }
                 }
-                Text("\(score.total) total")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
+                // Counts up from this round's starting total to
+                // `score.total` via `.contentTransition(.numericText())`
+                // rather than snapping straight to the new number — see
+                // `AnimatedScoreText`.
+                AnimatedScoreText(
+                    value: score.total,
+                    from: score.total - score.delta,
+                    suffix: " total",
+                    font: .caption,
+                    color: Color.secondary
+                )
             }
 
             Spacer(minLength: 0)
@@ -184,6 +202,13 @@ struct TriviaRoundResultView: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
         .background(isMe ? Color.indigo.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+        .scaleEffect(revealed ? 1.0 : 0.85)
+        .opacity(revealed ? 1.0 : 0.0)
+        // Shared card-reveal vocabulary with `VoteRevealView`'s results —
+        // see that view's matching modifier for why the delay is still
+        // threaded through even though `.motion(_:value:)` alone already
+        // collapses to an instant cut under Reduce Motion.
+        .motion(Motion.arrival.delay(Motion.staggerDelay(index: rank - 1, reduceMotion: reduceMotion)), value: revealed)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(score.displayName)\(isMe ? ", you" : ""), rank \(rank), "
@@ -191,6 +216,30 @@ struct TriviaRoundResultView: View {
                 + "\(score.total) points total"
                 + (isTopScorer ? ", fastest correct answer this round" : "")
         )
+    }
+
+    // MARK: - Reveal Animation
+
+    /// Staggers each standings row's spring-in by rank. Mirrors
+    /// `VoteRevealView.animateReveal()` exactly, including the Reduce
+    /// Motion branch: every row is made visible synchronously (not via a
+    /// zero-delay `Task`) so nothing is left waiting on a runloop turn that
+    /// would otherwise make it briefly — or, if this view were ever torn
+    /// down first, permanently — invisible.
+    private func animateReveal() {
+        guard !reduceMotion else {
+            revealedIds = Set(rankedScores.map(\.playerId))
+            return
+        }
+
+        for (index, score) in rankedScores.enumerated() {
+            let delay = Motion.staggerDelay(index: index, reduceMotion: reduceMotion)
+            Task {
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled else { return }
+                revealedIds.insert(score.playerId)
+            }
+        }
     }
 
     // MARK: - Footer
@@ -225,6 +274,49 @@ struct TriviaRoundResultView: View {
         let displayName: String
         let total: Int
         let delta: Int
+    }
+}
+
+// MARK: - Animated Score Text
+
+/// Rolls a running total from `from` up to `value` using
+/// `.contentTransition(.numericText())` — the modern, declarative way to
+/// "count up" a number — rather than a hand-rolled `Timer`/`Task.sleep`
+/// loop stepping through intermediate integers. `suffix` rides along inside
+/// the same `Text` (e.g. `" total"`) so only the digits animate.
+///
+/// Under Reduce Motion the count still lands on `value`, it just does so as
+/// a single non-animated update — see `Motion.withAnimation`.
+private struct AnimatedScoreText: View {
+    let value: Int
+    let from: Int
+    var suffix: String = ""
+    var font: Font = .title3.weight(.bold)
+    var color: Color = .primary
+
+    @State private var displayedValue: Int
+    @Environment(\.motionReduceMotion) private var reduceMotion
+
+    init(value: Int, from: Int, suffix: String = "", font: Font = .title3.weight(.bold), color: Color = .primary) {
+        self.value = value
+        self.from = from
+        self.suffix = suffix
+        self.font = font
+        self.color = color
+        _displayedValue = State(initialValue: from)
+    }
+
+    var body: some View {
+        Text("\(displayedValue)\(suffix)")
+            .font(font)
+            .monospacedDigit()
+            .foregroundStyle(color)
+            .contentTransition(.numericText())
+            .onAppear {
+                Motion.withAnimation(Motion.emphasis, reduceMotion: reduceMotion) {
+                    displayedValue = value
+                }
+            }
     }
 }
 
@@ -347,5 +439,24 @@ private extension TriviaRoundResultView {
         isFinalRound: false
     )
     .dynamicTypeSize(.accessibility3)
+}
+
+/// Confirms every standings row and its final total are fully visible
+/// immediately — no waiting on the staggered spring `animateReveal()`
+/// skips, and no reliance on the numeric count-up ever playing.
+#Preview("Reduce Motion") {
+    TriviaRoundResultView(
+        roundNumber: 2,
+        totalRounds: 5,
+        question: TriviaRoundResultView.sampleQuestion,
+        options: TriviaRoundResultView.sampleOptions,
+        correctIndex: TriviaRoundResultView.sampleCorrectIndex,
+        mySelectedIndex: 1,
+        myPlayerId: TriviaRoundResultView.playerA,
+        result: TriviaRoundResultView.sampleResult,
+        previousScores: TriviaRoundResultView.samplePreviousScores,
+        isFinalRound: false
+    )
+    .environment(\.motionReduceMotion, true)
 }
 #endif

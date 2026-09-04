@@ -4,9 +4,6 @@
 //
 
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 /// Renders one Vote Battle game end-to-end: prompt → vote → reveal → next
 /// round, purely from `GameEngine`'s observable state.
@@ -173,9 +170,8 @@ struct VoteGameView: View {
     private func selectTarget(_ playerId: UUID) {
         guard let current = flow.current, current.payload.myVoteTargetId == nil else { return }
 
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
+        HapticEngine.shared.play(.selection)
+        SoundPlayer.shared.play(.selection)
 
         flow.updateCurrent { $0.myVoteTargetId = playerId }
         appState.submitPlayerInput(.vote(targetPlayerId: playerId))

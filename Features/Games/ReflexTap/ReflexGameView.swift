@@ -4,9 +4,6 @@
 //
 
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 /// Renders one Reflex Tap game end-to-end: tension build-up -> flash -> tap
 /// -> reveal -> next round, purely from `GameEngine`'s observable state.
@@ -176,13 +173,13 @@ struct ReflexGameView: View {
         let wasEarly = phase == .waiting
         flow.update(round: roundIndex) { $0.phase = wasEarly ? .tooSoon : .lockedIn }
 
-        #if canImport(UIKit)
         if wasEarly {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            HapticEngine.shared.play(.answerWrong)
+            SoundPlayer.shared.play(.answerWrong)
         } else {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            HapticEngine.shared.play(.tapRegistered)
+            SoundPlayer.shared.play(.tapRegistered)
         }
-        #endif
 
         appState.submitPlayerInput(.reflexTap(timestamp: Date()))
     }
@@ -195,7 +192,20 @@ struct ReflexGameView: View {
     /// `roundQueue` by `presentReveal()`), in which case this is a no-op.
     /// Cancelled automatically by SwiftUI's `.task(id:)` once this round's
     /// `ReflexPromptView` leaves the hierarchy.
+    ///
+    /// Primes both generators it might need — `.roundStart` (the flash
+    /// itself) and `.tapRegistered` (a valid tap immediately after) — the
+    /// instant the tension phase begins, well ahead of either one actually
+    /// firing. Reflex Tap is the one mode where `UIFeedbackGenerator`'s
+    /// priming latency reduction is worth the trade-off (see `HapticEngine`'s
+    /// doc comment): the entire game is testing reaction speed, so shaving
+    /// the generator's cold-start latency off the flash cue and the tap
+    /// acknowledgement actually matters here in a way it doesn't for, say, a
+    /// trivia answer selection.
     private func runFlashTimer(roundIndex: Int, delay: TimeInterval) async {
+        HapticEngine.shared.prepare(.roundStart)
+        HapticEngine.shared.prepare(.tapRegistered)
+
         do {
             try await Task.sleep(for: .seconds(delay))
         } catch {
@@ -205,9 +215,8 @@ struct ReflexGameView: View {
         guard flow.payload(forRound: roundIndex)?.phase == .waiting else { return }
 
         flow.update(round: roundIndex) { $0.phase = .flash }
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        #endif
+        HapticEngine.shared.play(.roundStart)
+        SoundPlayer.shared.play(.roundStart)
     }
 
     // MARK: - Reveal Feedback
@@ -221,9 +230,8 @@ struct ReflexGameView: View {
         let myNewScore = reveal.result.scores.first { $0.playerId == myPlayerId }?.score ?? myPreviousScore
         guard myNewScore > myPreviousScore else { return }
 
-        #if canImport(UIKit)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        #endif
+        HapticEngine.shared.play(.winnerReveal)
+        SoundPlayer.shared.play(.winnerReveal)
     }
 
     // MARK: - Types
@@ -321,7 +329,10 @@ private struct ReflexPromptView: View {
     let phase: TapPhase
     var onTap: () -> Void = {}
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // The app-wide mirror rather than SwiftUI's own key, so there is a
+    // single source of truth for Reduce Motion and this view is previewable
+    // in both states. ContentView feeds the mirror from the real key.
+    @Environment(\.motionReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
