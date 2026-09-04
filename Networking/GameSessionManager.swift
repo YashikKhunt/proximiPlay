@@ -132,6 +132,14 @@ final class GameSessionManager: NSObject, Sendable {
     /// Invoked on `@MainActor` when a `GameMessage` arrives from a peer.
     @MainActor var onMessageReceived: (@MainActor @Sendable (GameMessage, MCPeerID) -> Void)?
 
+    /// Invoked on the host when a peer actually drops, carrying the
+    /// departed `Player.id`.
+    ///
+    /// Peer loss surfaces as an `MCSession` state change, not as a
+    /// `GameMessage`, so this is the only signal game state gets that
+    /// somebody left mid-round.
+    @MainActor var onPlayerLeft: (@MainActor @Sendable (UUID) -> Void)?
+
     // MARK: - Pending Invitation
 
     /// A peer's request to join, held until the host accepts or declines.
@@ -477,8 +485,15 @@ extension GameSessionManager: MCSessionDelegate {
                     )
                 }
                 if self.isHost {
-                    self.roster.hostPlayerLeft(peer: peerID)
+                    let departedId = self.roster.hostPlayerLeft(peer: peerID)
                     self.broadcastLobbyUpdate()
+                    // A real peer drop never produces a `.disconnect` wire
+                    // message — nothing sends one — so the engine has to be
+                    // told here, or a departed player keeps holding up the
+                    // round and stays in the drawer rotation.
+                    if let departedId {
+                        self.onPlayerLeft?(departedId)
+                    }
                 }
             }
 

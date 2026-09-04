@@ -233,3 +233,44 @@ struct GameSessionManagerRelayAuthenticityTests {
         #expect(!sut.isMessageAuthentic(spoofed, from: strangerPeer))
     }
 }
+
+// MARK: - Peer Departure Wiring
+
+/// A real peer drop surfaces as an `MCSession` state change, never as a
+/// `.disconnect` message — nothing in the app sends one. These pin the
+/// `onPlayerLeft` wiring that carries a departure into game state. When it
+/// was missing, the engine kept a departed player in the round: the round
+/// burned its full timeout instead of ending early, their score lingered in
+/// later results, and they stayed in the Speed Draw drawer rotation
+/// (`GameEngine.playerDisconnected` was unreachable in production).
+@MainActor
+struct PeerDepartureWiringTests {
+
+    @Test func rosterReportsTheDepartedPlayerId() {
+        let roster = PlayerRoster()
+        let peer = MCPeerID(displayName: "Alice")
+        let joined = roster.hostPlayerJoined(peer: peer, displayName: "Alice")
+
+        #expect(roster.hostPlayerLeft(peer: peer) == joined.id)
+        // A repeat departure for the same peer has nothing left to report.
+        #expect(roster.hostPlayerLeft(peer: peer) == nil)
+    }
+
+    @Test func onPlayerLeftIsWiredAndReachesTheEngine() throws {
+        let appState = AppState()
+        let players = makePlayers(2)
+        appState.gameEngine.startGame(mode: .quickTrivia, roster: players)
+        #expect(appState.gameEngine.isRunning)
+
+        // Fire the exact callback GameSessionManager invokes on a real peer
+        // drop. Dropping to one player must end the game gracefully — which
+        // only happens if the callback actually reaches the engine.
+        let handler = try #require(
+            appState.gameSessionManager.onPlayerLeft,
+            "onPlayerLeft must be wired in AppState.init"
+        )
+        handler(players[1].id)
+
+        #expect(!appState.gameEngine.isRunning)
+    }
+}

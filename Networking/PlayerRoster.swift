@@ -77,10 +77,16 @@ final class PlayerRoster {
     }
 
     /// Removes a disconnected peer's `Player` entry from the roster.
-    func hostPlayerLeft(peer: MCPeerID) {
-        guard let playerId = peerToPlayerId.removeValue(forKey: peer) else { return }
+    ///
+    /// Returns the departed player's id so callers can propagate the
+    /// departure to game state that is keyed by `Player.id` rather than by
+    /// peer (e.g. `GameEngine.playerDisconnected(_:)`).
+    @discardableResult
+    func hostPlayerLeft(peer: MCPeerID) -> UUID? {
+        guard let playerId = peerToPlayerId.removeValue(forKey: peer) else { return nil }
         players.removeAll { $0.id == playerId }
         Self.logger.info("Roster: peer \(peer.displayName) left")
+        return playerId
     }
 
     // MARK: - Joiner-side mutation

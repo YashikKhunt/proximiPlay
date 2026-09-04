@@ -150,6 +150,14 @@ final class AppState {
                 break
             }
         }
+
+        // Peer loss arrives as an MCSession state change, never as a
+        // `.disconnect` message — nothing in the app sends one — so this is
+        // the only path that tells game state somebody left mid-round.
+        gameSessionManager.onPlayerLeft = { playerId in
+            strokeThrottle.reset(playerId)
+            engine.playerDisconnected(playerId)
+        }
     }
 
     /// Explicitly tears down the active session and stops connection
