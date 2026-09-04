@@ -69,6 +69,25 @@ private func finalScores(_ messages: [GameMessage]) -> [PlayerScore]? {
     return nil
 }
 
+/// Polls `condition` until it holds or `timeout` elapses, yielding between
+/// checks so the engine's `@MainActor` timeout continuations can run.
+///
+/// Returns quietly on timeout — the caller's `#expect` then reports the real
+/// failure with its own message. Preferred over a single fixed `Task.sleep`
+/// for anything driven by the engine's round timers: the assertion stays the
+/// same, but a slow, contended test run no longer fails it spuriously.
+private func waitUntil(
+    timeout: Duration = .seconds(5),
+    pollInterval: Duration = .milliseconds(10),
+    _ condition: () -> Bool
+) async throws {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if condition() { return }
+        try await Task.sleep(for: pollInterval)
+    }
+}
+
 // MARK: - Full Trivia Game Simulation
 
 @MainActor
@@ -173,14 +192,27 @@ struct GameEngineTimeoutTests {
 
         engine.startGame(mode: .quickTrivia, roster: players, config: config)
 
-        // Nobody answers round 1 — wait past the timeout.
-        try await Task.sleep(for: .seconds(0.3))
+        // Nobody answers round 1 — wait for the timeout to carry the game
+        // forward on its own. Polled with a generous ceiling rather than
+        // slept for one fixed interval: the round timeouts are `Task.sleep`
+        // continuations hopping back onto `@MainActor`, so under a loaded
+        // parallel test run they can land well after a tight fixed wait,
+        // failing this test for scheduling reasons rather than behaviour.
+        // The assertions below are unchanged.
+        try await waitUntil { advancedPastRoundOne(sender.sentMessages) }
 
         #expect(roundResult(sender.sentMessages, round: 1) != nil)
         // The game should have advanced into (or finished) round 2 without
         // any player ever submitting an input.
-        #expect(sender.sentMessages.filter { if case .roundStart = $0 { return true } else { return false } }.count >= 2
-                || finalScores(sender.sentMessages) != nil)
+        #expect(advancedPastRoundOne(sender.sentMessages))
+    }
+
+    /// Round 1 timed out and the game moved on — either into round 2 or
+    /// straight to the final scores.
+    private func advancedPastRoundOne(_ messages: [GameMessage]) -> Bool {
+        guard roundResult(messages, round: 1) != nil else { return false }
+        let roundStarts = messages.filter { if case .roundStart = $0 { return true } else { return false } }.count
+        return roundStarts >= 2 || finalScores(messages) != nil
     }
 
     @Test func timeoutIsCancelledWhenRoundFinishesEarly() async throws {

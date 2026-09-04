@@ -48,6 +48,13 @@ final class GameSessionManager: NSObject, Sendable {
     /// UserDefaults key for the archived MCPeerID.
     private static let peerIDKey = "proximiplay.myPeerID"
 
+    /// Maximum accepted size (in bytes) for the invitation context a joiner
+    /// attaches to `joinHost(_:)`. The payload is just a UTF-8 nickname
+    /// bounded by `PlayerNickname.maxLength`, so anything larger is a
+    /// malformed or hostile peer and is ignored in favour of the peer's own
+    /// display name.
+    nonisolated static let maxInvitationContextBytes = 256
+
     // MARK: - Logger
 
     // nonisolated: Logger is Sendable and this is an immutable let, so it is
@@ -85,7 +92,13 @@ final class GameSessionManager: NSObject, Sendable {
     /// Whether this device is the game host (advertiser).
     @MainActor var isHost: Bool = false
 
-    /// The local player representation, initialized from the device name.
+    /// The local player representation.
+    ///
+    /// Seeded from the persisted nickname (`PlayerNickname.load()`), then —
+    /// on a joiner — **replaced wholesale** by whatever the host assigns via
+    /// `.identityAssignment(player:)`. The id, color and host flag are
+    /// always the host's to decide; this device only ever *requests* a
+    /// display name.
     @MainActor var myPlayer: Player
 
     /// A join request awaiting the host's explicit accept/decline decision.
@@ -106,6 +119,21 @@ final class GameSessionManager: NSObject, Sendable {
     /// itself wherever a message needs to reliably re-trigger on every
     /// rebroadcast, not just the first.
     @MainActor var lastGameStartToken: Int = 0
+
+    /// Monotonically increments on every `.lobbyReturn` accepted from the
+    /// host — the joiner-side signal that the host tapped "Back to Lobby"
+    /// on `ResultsView`. A token rather than a `Bool` for the same reason
+    /// as `lastGameStartToken`: a second return after a second game must
+    /// re-fire SwiftUI's `.onChange`, and a `Bool` that is already `true`
+    /// wouldn't. Never incremented on the host (`isFromHost` is always
+    /// `false` there), so the host can't follow its own broadcast.
+    @MainActor var lobbyReturnToken: Int = 0
+
+    /// Nicknames peers asked for in their invitation context, held from the
+    /// advertiser callback until the matching `.connected` state change
+    /// creates their roster entry. Sanitized on the way *in* to the roster
+    /// (`PlayerRoster.hostPlayerJoined`), never trusted raw.
+    @ObservationIgnored @MainActor private var requestedNicknames: [MCPeerID: String] = [:]
 
     /// The host-authoritative player roster, kept in sync across every
     /// device via `.lobbyUpdate` broadcasts. Also consulted from the
@@ -168,8 +196,10 @@ final class GameSessionManager: NSObject, Sendable {
         let peerID = Self.loadOrCreatePeerID()
         self.myPeerID = peerID
 
+        // The nickname is app-level identity and is deliberately *not* used
+        // to build `myPeerID` — see `PlayerNickname`'s doc comment.
         self.myPlayer = Player(
-            displayName: peerID.displayName,
+            displayName: PlayerNickname.load(),
             color: .blue,
             isHost: false
         )
@@ -229,6 +259,10 @@ final class GameSessionManager: NSObject, Sendable {
         stopSession()
 
         isHost = true
+        // Pick up any nickname edit made since this manager was created —
+        // the host seeds its own roster entry from `myPlayer`, so this is
+        // the name every other device will render for it.
+        myPlayer.displayName = PlayerNickname.load()
         myPlayer.isHost = true
         connectionState = .advertising
         hostPeerID = nil
@@ -253,6 +287,7 @@ final class GameSessionManager: NSObject, Sendable {
         stopSession()
 
         isHost = false
+        myPlayer.displayName = PlayerNickname.load()
         myPlayer.isHost = false
         connectionState = .browsing
 
@@ -280,14 +315,44 @@ final class GameSessionManager: NSObject, Sendable {
 
         connectionState = .connecting
         hostPeerID = peerID
+        // The invitation context is how this device's chosen nickname
+        // reaches the host *before* the host builds its roster entry — the
+        // `MCPeerID` carries only the (privacy-leaking) device name, and
+        // must not be rebuilt from the nickname (see `PlayerNickname`).
+        // The host still sanitizes it and still owns the final identity.
+        let nickname = PlayerNickname.load()
+        myPlayer.displayName = nickname
         browser.invitePeer(
             peerID,
             to: session,
-            withContext: nil,
+            withContext: Data(nickname.utf8),
             timeout: 30
         )
 
         Self.logger.info("Invited host: \(peerID.displayName)")
+    }
+
+    // MARK: - Nickname
+
+    /// Persists a new nickname and applies it to the local player.
+    ///
+    /// Returns the value actually stored (sanitized — trimmed, length
+    /// capped, and falling back to the device name when cleared) so callers
+    /// can reflect exactly what other devices will see. When hosting, the
+    /// host's own roster entry is refreshed and rebroadcast so the lobby
+    /// updates everywhere; joiners carry the nickname to the host in their
+    /// invitation context instead (`joinHost(_:)`).
+    @discardableResult
+    @MainActor
+    func updateNickname(_ raw: String) -> String {
+        let stored = PlayerNickname.save(raw)
+        myPlayer.displayName = stored
+        if isHost {
+            roster.setHost(myPlayer)
+            broadcastLobbyUpdate()
+        }
+        Self.logger.info("Nickname updated")
+        return stored
     }
 
     // MARK: - Stopping
@@ -313,8 +378,10 @@ final class GameSessionManager: NSObject, Sendable {
         myPlayer.isHost = false
         hostPeerID = nil
         roster.reset()
+        requestedNicknames = [:]
         lastGameStart = nil
         lastGameStartToken = 0
+        lobbyReturnToken = 0
 
         Self.logger.info("Session stopped and state reset")
     }
@@ -428,11 +495,22 @@ final class GameSessionManager: NSObject, Sendable {
     }
 
     /// Validates and routes a decoded inbound message: drops spoofed
-    /// `.playerInput`/`.disconnect` messages, mirrors `.lobbyUpdate` into
-    /// the local roster on joiner devices, then forwards every message that
-    /// passes validation to `onMessageReceived`.
+    /// `.playerInput`/`.disconnect` messages, mirrors host-authoritative
+    /// session messages (`.lobbyUpdate`, `.identityAssignment`,
+    /// `.gameStart`, `.lobbyReturn`) into local state on joiner devices,
+    /// then forwards every message that passes validation to
+    /// `onMessageReceived`.
+    ///
+    /// Every one of those mirrors is guarded by `isFromHost(peerID)`, which
+    /// fails closed: it is `false` for any peer other than the one this
+    /// device invited via `joinHost(_:)`, and *always* `false` on the host
+    /// (which originates these messages and must never follow one).
+    ///
+    /// Internal rather than private purely so tests can drive the real
+    /// routing logic without a live `MCSession` — production code only ever
+    /// calls it from `session(_:didReceive:fromPeer:)`.
     @MainActor
-    private func receive(_ message: GameMessage, from peerID: MCPeerID) {
+    func receive(_ message: GameMessage, from peerID: MCPeerID) {
         guard isMessageAuthentic(message, from: peerID) else {
             Self.logger.warning(
                 "Dropped message from \(peerID.displayName) — playerId did not match roster mapping"
@@ -449,14 +527,31 @@ final class GameSessionManager: NSObject, Sendable {
             if let hostPlayer = players.first {
                 roster.setHostPeerMapping(peer: peerID, hostPlayerId: hostPlayer.id)
             }
-            if let assigned = players.first(where: { $0.displayName == myPlayer.displayName }) {
-                myPlayer = assigned
+            // Deliberately *no* name matching here: this device learns who
+            // it is only from `.identityAssignment` below. Matching on
+            // `displayName` gave two players with the same nickname the
+            // same identity, and the loser of that tie silently self-DoS'd
+            // (the host validates `playerId` against the sending peer).
+            // A roster refresh may still update this device's own entry —
+            // adopt it by id, never by name.
+            if let mine = players.first(where: { $0.id == myPlayer.id }) {
+                myPlayer = mine
             }
+        }
+
+        if case .identityAssignment(let assigned) = message, isFromHost(peerID) {
+            myPlayer = assigned
+            Self.logger.info("Adopted host-assigned identity")
         }
 
         if case .gameStart(let mode, let config) = message, isFromHost(peerID) {
             lastGameStart = (mode, config)
             lastGameStartToken += 1
+        }
+
+        if case .lobbyReturn = message, isFromHost(peerID) {
+            lobbyReturnToken += 1
+            Self.logger.info("Host returned the session to the lobby")
         }
 
         onMessageReceived?(message, peerID)
@@ -484,6 +579,7 @@ extension GameSessionManager: MCSessionDelegate {
                         reason: "\(displayName) disconnected"
                     )
                 }
+                self.requestedNicknames.removeValue(forKey: peerID)
                 if self.isHost {
                     let departedId = self.roster.hostPlayerLeft(peer: peerID)
                     self.broadcastLobbyUpdate()
@@ -512,7 +608,16 @@ extension GameSessionManager: MCSessionDelegate {
                 self.connectionState = .connected
 
                 if self.isHost {
-                    self.roster.hostPlayerJoined(peer: peerID, displayName: displayName)
+                    // Use the nickname the peer asked for in its invitation
+                    // context, falling back to its MCPeerID display name.
+                    // `hostPlayerJoined` sanitizes either way.
+                    let requested = self.requestedNicknames.removeValue(forKey: peerID) ?? displayName
+                    let assigned = self.roster.hostPlayerJoined(peer: peerID, displayName: requested)
+                    // Tell *this* peer exactly who it is before the roster
+                    // broadcast, so it never has to recognise itself in a
+                    // list (which broke the moment two players shared a
+                    // nickname). Point-to-point, host → one joiner.
+                    self.send(.identityAssignment(player: assigned), to: [peerID])
                     self.broadcastLobbyUpdate()
                 }
             }
@@ -593,6 +698,7 @@ extension GameSessionManager: MCNearbyServiceAdvertiserDelegate {
         invitationHandler: @escaping (Bool, MCSession?) -> Void
     ) {
         Self.logger.info("Received invitation from: \(peerID.displayName)")
+        let requestedNickname = Self.nickname(fromInvitationContext: context)
         Task { @MainActor in
             // Enforce the player cap (host occupies one of maxPlayers slots)
             // and hold at most one pending request at a time. Everything else
@@ -603,11 +709,32 @@ extension GameSessionManager: MCNearbyServiceAdvertiserDelegate {
                 invitationHandler(false, nil)
                 return
             }
+            // Held until this peer actually connects, at which point it
+            // seeds the roster entry the host assigns them.
+            let name = PlayerNickname.sanitize(
+                requestedNickname ?? peerID.displayName,
+                fallback: peerID.displayName
+            )
+            self.requestedNicknames[peerID] = name
             self.pendingInvitation = PendingInvitation(
-                peerName: peerID.displayName,
+                peerName: name,
                 respond: invitationHandler
             )
         }
+    }
+
+    /// Decodes the nickname a joiner attached to its invitation, or `nil`
+    /// when the context is absent, oversized, or not valid UTF-8.
+    ///
+    /// A free function of `Data?`, so the size/encoding guards are directly
+    /// unit-testable without a live advertiser.
+    nonisolated static func nickname(fromInvitationContext context: Data?) -> String? {
+        guard let context, !context.isEmpty else { return nil }
+        guard context.count <= maxInvitationContextBytes else {
+            logger.warning("Ignored oversize invitation context: \(context.count) bytes")
+            return nil
+        }
+        return String(data: context, encoding: .utf8)
     }
 
     /// Resolves the pending join request with the host's decision.

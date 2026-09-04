@@ -57,6 +57,14 @@ final class PlayerRoster {
     /// color drawn from `PlayerColor.allCases` by join order. No-op (returns
     /// the existing player) if the peer is already registered, guarding
     /// against duplicate `.connected` delegate callbacks.
+    ///
+    /// `displayName` is the nickname the joiner asked for (carried in its
+    /// invitation context) and is therefore attacker-controlled: it is run
+    /// through `PlayerNickname.sanitize(_:fallback:)` before it enters the
+    /// roster, so an empty or arbitrarily long name can't be pushed into
+    /// every device's player list. Duplicate names are *allowed* and stay
+    /// distinct — identity is the assigned `Player.id`, never the name (see
+    /// `GameMessage.identityAssignment`).
     @discardableResult
     func hostPlayerJoined(peer: MCPeerID, displayName: String) -> Player {
         if let existingId = peerToPlayerId[peer],
@@ -66,7 +74,7 @@ final class PlayerRoster {
 
         let colorIndex = players.count % PlayerColor.allCases.count
         let player = Player(
-            displayName: displayName,
+            displayName: PlayerNickname.sanitize(displayName, fallback: peer.displayName),
             color: PlayerColor.allCases[colorIndex],
             isHost: false
         )
@@ -134,6 +142,17 @@ final class PlayerRoster {
     /// `ConnectionMonitor.peerHealth`.
     func peerID(for playerId: UUID) -> MCPeerID? {
         peerToPlayerId.first { $0.value == playerId }?.key
+    }
+
+    /// Host-side: the `Player` this roster assigned to `peer`, if any.
+    ///
+    /// The host sends exactly this back to the peer as
+    /// `.identityAssignment(player:)`, which is how a joiner learns who it
+    /// is — no name matching, so two devices sharing a nickname still get
+    /// distinct identities.
+    func player(for peer: MCPeerID) -> Player? {
+        guard let playerId = peerToPlayerId[peer] else { return nil }
+        return players.first { $0.id == playerId }
     }
 
     // MARK: - Reset

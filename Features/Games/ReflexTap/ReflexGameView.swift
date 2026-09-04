@@ -81,12 +81,10 @@ struct ReflexGameView: View {
     private var engine: GameEngine { appState.gameEngine }
     private var myPlayerId: UUID { appState.gameSessionManager.myPlayer.id }
 
-    /// `GameEngine.totalRounds` is never populated on joiner devices (see
-    /// `TriviaGameView`'s identical fallback). Reflex Tap's round count is
-    /// fixed (best-of-5) regardless of roster size.
-    private var totalRounds: Int {
-        engine.totalRounds > 0 ? engine.totalRounds : GameConfig.defaultConfig(for: .reflexTap).roundCount
-    }
+    /// Host-authoritative on every device: the host sets this in
+    /// `startGame`, joiners mirror it from the host's `.gameStart`
+    /// (`GameEngine.applyFollowerMessage`). No local `GameConfig` guess.
+    private var totalRounds: Int { engine.totalRounds }
 
     /// See "Detecting a new round with no per-round payload" above.
     private var isRoundActive: Bool {

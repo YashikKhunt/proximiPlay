@@ -46,14 +46,10 @@ struct TriviaGameView: View {
 
     private var engine: GameEngine { appState.gameEngine }
 
-    /// `GameEngine.totalRounds` is never populated on joiner devices
-    /// (`applyFollowerMessage` only mirrors `currentRound`/`lastRoundResult`/
-    /// `finalScores`), so fall back to Quick Trivia's fixed round count —
-    /// identical to what the host actually used, since `GameConfig`'s
-    /// trivia default doesn't vary by player count.
-    private var totalRounds: Int {
-        engine.totalRounds > 0 ? engine.totalRounds : GameConfig.defaultConfig(for: .quickTrivia).roundCount
-    }
+    /// Host-authoritative on every device: the host sets this in
+    /// `startGame`, joiners mirror it from the host's `.gameStart`
+    /// (`GameEngine.applyFollowerMessage`). No local `GameConfig` guess.
+    private var totalRounds: Int { engine.totalRounds }
 
     private var roundDuration: TimeInterval {
         GameConfig.defaultConfig(for: .quickTrivia).timePerRound

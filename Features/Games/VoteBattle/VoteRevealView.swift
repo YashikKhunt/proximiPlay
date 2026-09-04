@@ -19,15 +19,14 @@ import UIKit
 /// and for the actual advance-to-next-round timing; this view only renders a
 /// snapshot and reports the user's "continue" tap on the final round.
 ///
-/// ## Why there's no per-player vote count
+/// ## Vote counts
 ///
-/// `RoundResult` only carries `highlightPlayerId` — the single most-voted
-/// player — never a full tally. `GameEngine` computes that tally internally
-/// (`GameEngine.voteTally`, host-only, private state) purely to pick the
-/// highlight and discards it; no message on the wire ever carries individual
-/// vote counts. Rather than invent numbers the app was never actually told,
-/// this view reveals *who won* the round, not *by how much* — a spring-in
-/// crown for the highlighted player and a plain reveal for everyone else.
+/// `RoundResult.voteCounts` carries the host's per-player tally
+/// (`GameEngine.voteTally`) on the wire, so every device shows the real
+/// numbers — not just who won, but by how much. Players with no votes are
+/// absent from the tally and read back as `0` via `voteCount(for:)`. The
+/// tally is `nil` for a round nobody voted in, in which case the counts are
+/// suppressed entirely rather than rendering a wall of zeroes.
 struct VoteRevealView: View {
     let roundNumber: Int
     let totalRounds: Int
@@ -87,11 +86,24 @@ struct VoteRevealView: View {
 
     // MARK: - Results
 
+    /// `true` once the host has sent a real tally for this round — the only
+    /// case where per-player counts are meaningful.
+    private var hasTally: Bool { result.voteCounts != nil }
+
     private var results: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Results")
-                .font(.headline)
-                .foregroundStyle(Color.primary)
+            HStack {
+                Text("Results")
+                    .font(.headline)
+                    .foregroundStyle(Color.primary)
+                Spacer(minLength: 0)
+                if hasTally {
+                    Text(result.totalVotes == 1 ? "1 vote cast" : "\(result.totalVotes) votes cast")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.secondary)
+                }
+            }
 
             VStack(spacing: 8) {
                 ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
@@ -106,6 +118,7 @@ struct VoteRevealView: View {
         let isMyVote = myVoteTargetId == player.id
         let isMe = player.id == myPlayerId
         let revealed = revealedIds.contains(player.id)
+        let votes = result.voteCount(for: player.id)
 
         return HStack(spacing: 12) {
             PlayerBadge(player: player)
@@ -124,10 +137,30 @@ struct VoteRevealView: View {
             Spacer(minLength: 0)
 
             if isWinner {
-                Label("Most Votes", systemImage: "crown.fill")
+                Image(systemName: "crown.fill")
+                    .font(.caption)
+                    .foregroundStyle(Color.yellow)
+                    .accessibilityHidden(true)
+            }
+
+            if hasTally {
+                // The count itself carries the ranking — never colour
+                // alone, so it still reads at a glance without relying on
+                // the yellow highlight.
+                Text(votes == 1 ? "1 vote" : "\(votes) votes")
+                    .font(.caption.weight(isWinner ? .bold : .regular))
+                    .monospacedDigit()
+                    .foregroundStyle(isWinner ? Color.yellow : Color.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        isWinner ? Color.yellow.opacity(0.2) : Color.secondary.opacity(0.12),
+                        in: Capsule()
+                    )
+            } else if isWinner {
+                Text("Most Votes")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.yellow)
-                    .labelStyle(.titleAndIcon)
             }
         }
         .padding(.vertical, 10)
@@ -147,13 +180,22 @@ struct VoteRevealView: View {
             value: revealed
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(rowAccessibilityLabel(player: player, isWinner: isWinner, isMyVote: isMyVote, isMe: isMe))
+        .accessibilityLabel(
+            rowAccessibilityLabel(player: player, isWinner: isWinner, isMyVote: isMyVote, isMe: isMe, votes: votes)
+        )
     }
 
-    private func rowAccessibilityLabel(player: Player, isWinner: Bool, isMyVote: Bool, isMe: Bool) -> String {
+    private func rowAccessibilityLabel(
+        player: Player,
+        isWinner: Bool,
+        isMyVote: Bool,
+        isMe: Bool,
+        votes: Int
+    ) -> String {
         var parts = [player.displayName]
         if isMe { parts.append("you") }
         if isMyVote { parts.append("your vote") }
+        if hasTally { parts.append(votes == 1 ? "1 vote" : "\(votes) votes") }
         if isWinner { parts.append("most votes this round") }
         return parts.joined(separator: ", ")
     }
@@ -217,7 +259,17 @@ private extension VoteRevealView {
     static let sampleResult = RoundResult(
         roundNumber: 2,
         scores: samplePlayers.map { PlayerScore(playerId: $0.id, displayName: $0.displayName, score: 0) },
-        highlightPlayerId: playerB.id
+        highlightPlayerId: playerB.id,
+        // Exactly the shape `GameEngine.voteTally` produces: only players
+        // who actually received votes appear.
+        voteCounts: [playerB.id: 2, playerC.id: 1]
+    )
+
+    /// A round nobody voted in — the host sends no tally, so the counts
+    /// (and the winner crown) are suppressed rather than shown as zeroes.
+    static let noVotesResult = RoundResult(
+        roundNumber: 2,
+        scores: samplePlayers.map { PlayerScore(playerId: $0.id, displayName: $0.displayName, score: 0) }
     )
 }
 
@@ -230,6 +282,19 @@ private extension VoteRevealView {
         myVoteTargetId: VoteRevealView.playerB.id,
         myPlayerId: VoteRevealView.playerA.id,
         result: VoteRevealView.sampleResult,
+        isFinalRound: false
+    )
+}
+
+#Preview("No Votes Cast") {
+    VoteRevealView(
+        roundNumber: 2,
+        totalRounds: 5,
+        prompt: VoteRevealView.samplePrompt,
+        players: VoteRevealView.samplePlayers,
+        myVoteTargetId: nil,
+        myPlayerId: VoteRevealView.playerA.id,
+        result: VoteRevealView.noVotesResult,
         isFinalRound: false
     )
 }

@@ -139,14 +139,27 @@ final class AppState {
                     engine.playerDisconnected(playerId)
                 }
 
-            case .roundStart, .roundResult, .gameEnd:
+            case .gameStart, .roundStart, .roundResult, .gameEnd:
+                // `.gameStart` joins the follower branch so a joiner's
+                // engine learns the mode and round count (see
+                // `GameEngine.applyFollowerMessage`) — it is exactly as
+                // host-authoritative as the round messages, so it gets the
+                // exact same origin gate: dropped from any peer that isn't
+                // the joined host, and dropped unconditionally on the host.
                 guard sessionManager.isFromHost(peerID) else {
                     Self.logger.warning("Dropped \(String(describing: message)) not from the host peer")
                     return
                 }
                 engine.applyFollowerMessage(message)
 
-            case .lobbyUpdate, .gameStart:
+            case .lobbyUpdate, .identityAssignment, .lobbyReturn:
+                // Session-level, not game-level: mirrored into
+                // `GameSessionManager` state (roster, `myPlayer`,
+                // `lobbyReturnToken`) inside its own `receive(_:from:)`,
+                // behind the same `isFromHost` gate. `.lobbyReturn`'s
+                // navigation + engine teardown happen together in
+                // `ResultsView` so joiners never render a half-cleared
+                // game.
                 break
             }
         }
@@ -182,6 +195,19 @@ final class AppState {
             return true
         }
         return false
+    }
+
+    /// Drops the finished game while **keeping the Multipeer session
+    /// connected**, so everyone can regroup in the lobby for the next one.
+    ///
+    /// Both sides of "Back to Lobby" run this: the host from `ResultsView`'s
+    /// button (which also broadcasts `.lobbyReturn`) and every joiner from
+    /// `ContentView`'s `lobbyReturnToken` observer. Contrast
+    /// `resetAfterHostLeft()`, which also tears the session down because
+    /// there is nothing left to stay connected to.
+    func returnToLobbyAfterHostReturn() {
+        gameEngine.reset()
+        currentGameState = .idle
     }
 
     /// Clears game and session state after `hostLeft` fires, returning the

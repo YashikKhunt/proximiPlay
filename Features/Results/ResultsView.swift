@@ -18,41 +18,38 @@ import UIKit
 /// are offered (`actions`) and which device writes to SwiftData
 /// (`persistIfNeeded()`, host-only).
 ///
-/// ## Why `mode` reads `AppState.currentGameState`, not `GameEngine.mode`
+/// ## Where `mode` comes from
 ///
-/// `GameEngine.applyFollowerMessage(_:)` — the path that drives every
-/// observable property on a **joiner** device — never sets `GameEngine.mode`
-/// (only the host-only `startGame(mode:roster:)` does). Reading
-/// `engine.mode` here would silently be `nil` on every joiner, breaking the
-/// Vote Battle social framing and the "waiting for host" copy. `AppState`'s
-/// `currentGameState` is set to `.playing(mode)` on **both** roles the
-/// moment the game starts (`LobbyView.startGame()` on the host,
-/// `LobbyView`'s `.onChange(of: sessionManager.lastGameStart?.mode)` on
-/// joiners) and nothing overwrites it until this view's own "Play Again" /
-/// "Back to Lobby" handlers or a host-left reset — so it stays a reliable,
-/// role-agnostic source for "which mode just finished."
+/// Straight from `GameEngine.mode`, on both roles: the host sets it in
+/// `startGame(mode:roster:)` and a joiner mirrors it from the host's
+/// `.gameStart` (`GameEngine.applyFollowerMessage`). It used to be derived
+/// from `AppState.currentGameState` purely because `applyFollowerMessage`
+/// never set `mode`, leaving it `nil` on every joiner — that gap is closed,
+/// so the engine is now the single source for "which mode just finished."
 ///
 /// ## "Play Again" / "Back to Lobby" sync design
 ///
-/// There is no wire message for "return to lobby," so joiners have no way
-/// to be told the host bailed back to the lobby without picking a new game —
-/// they simply stay on `ResultsView` showing "Waiting for the host…" until
-/// the next `.gameStart` arrives (a real, if soft, gap — see the "Known
-/// Phase 3 refinement" note below). "Play Again" reuses the existing
-/// `.gameStart` broadcast (the same message
-/// `LobbyView.startGame()` sends), so joiners' existing navigation plumbing
-/// already knows how to follow it. The one gap: `GameSessionManager
-/// .lastGameStart` only changes value the *first* time a mode starts —
-/// replaying the *same* mode a second time wouldn't otherwise re-fire a
-/// SwiftUI `.onChange`. `GameSessionManager.lastGameStartToken` (a small
-/// monotonic counter incremented on every `.gameStart`, regardless of
-/// whether the mode changed) exists purely to make that re-trigger reliable
-/// — see its doc comment.
+/// Both host actions are broadcast, so joiners follow immediately instead of
+/// sitting on stale final scores:
 ///
-/// Known Phase 3 refinement: a dedicated `.lobbyReturn` wire message would
-/// let joiners follow "Back to Lobby" immediately instead of waiting on the
-/// next game start; adding it here would touch the shared `GameMessage`
-/// enum out of this task's scope.
+/// - **Play Again** reuses `.gameStart` (the same message
+///   `LobbyView.startGame()` sends), so joiners' existing navigation
+///   plumbing already knows how to follow it. The one wrinkle:
+///   `GameSessionManager.lastGameStart` only changes value the *first* time
+///   a mode starts — replaying the *same* mode wouldn't re-fire a SwiftUI
+///   `.onChange`. `lastGameStartToken` (a monotonic counter bumped on every
+///   `.gameStart`) exists purely to make that re-trigger reliable.
+/// - **Back to Lobby** broadcasts `.lobbyReturn`. Joiners follow it from
+///   `ContentView`, not from here: a joiner can still be sitting on a mode
+///   view's final-round reveal when the host taps it, and only a
+///   root-level observer of `GameSessionManager.lobbyReturnToken` brings
+///   *every* screen back. The Multipeer session stays connected — only the
+///   finished game is torn down — so everyone lands back in `LobbyView`
+///   together and waits for the host's next pick.
+///
+/// Both are host-authoritative and origin-gated in
+/// `GameSessionManager.receive(_:from:)`: a joiner can neither forge them
+/// nor have the host follow one.
 struct ResultsView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
@@ -72,11 +69,8 @@ struct ResultsView: View {
 
     private var finalScores: [PlayerScore] { engine.finalScores ?? [] }
 
-    /// See "Why `mode` reads `AppState.currentGameState`" above.
-    private var mode: GameMode? {
-        if case .playing(let mode) = appState.currentGameState { return mode }
-        return nil
-    }
+    /// See "Where `mode` comes from" above.
+    private var mode: GameMode? { engine.mode }
 
     private var isVoteBattle: Bool { mode == .voteBattle }
 
@@ -218,11 +212,11 @@ struct ResultsView: View {
     /// Vote Battle never awards points (`GameEngine.computeScoreDeltas`
     /// returns an empty diff for it), so a competitive rank-by-score list
     /// would just show everyone tied at zero. Instead this mirrors
-    /// `VoteRevealView`'s social framing: no ranking, just the roster and —
-    /// since `GameEngine` never accumulates a full-game vote tally, only
-    /// the most recent round's `highlightPlayerId` — a callout for who won
-    /// the *last* round's vote, honestly labeled as such rather than
-    /// inventing a game-long tally the app was never told.
+    /// `VoteRevealView`'s social framing: no ranking, just the roster, the
+    /// *last round's* per-player counts (`RoundResult.voteCounts`, the only
+    /// tally the wire carries — `GameEngine` accumulates no game-long one)
+    /// and a callout for who won it, both honestly labeled as last-round
+    /// figures rather than inventing a game-long total.
     private var voteBattleSummary: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Votes are just for fun — no points awarded.")
@@ -238,9 +232,11 @@ struct ResultsView: View {
     }
 
     private func voteBattleRow(for score: PlayerScore) -> some View {
-        let isFanFavorite = engine.lastRoundResult?.highlightPlayerId == score.playerId
+        let lastRound = engine.lastRoundResult
+        let isFanFavorite = lastRound?.highlightPlayerId == score.playerId
         let isMe = score.playerId == sessionManager.myPlayer.id
         let player = sessionManager.roster.players.first { $0.id == score.playerId }
+        let votes = lastRound?.voteCounts != nil ? lastRound?.voteCount(for: score.playerId) : nil
 
         return HStack(spacing: 14) {
             if let player {
@@ -270,6 +266,19 @@ struct ResultsView: View {
                     .scaleEffect(animateReveal ? 1.0 : 0.4)
                     .opacity(animateReveal ? 1.0 : 0.0)
             }
+
+            if let votes {
+                Text(votes == 1 ? "1 vote" : "\(votes) votes")
+                    .font(.caption.weight(isFanFavorite ? .bold : .regular))
+                    .monospacedDigit()
+                    .foregroundStyle(isFanFavorite ? Color.yellow : Color.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        isFanFavorite ? Color.yellow.opacity(0.2) : Color.secondary.opacity(0.12),
+                        in: Capsule()
+                    )
+            }
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
@@ -281,6 +290,7 @@ struct ResultsView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(score.displayName)\(isMe ? ", you" : "")\(isFanFavorite ? ", last round favorite" : "")"
+                + (votes.map { ", \($0 == 1 ? "1 vote" : "\($0) votes") last round" } ?? "")
         )
     }
 
@@ -365,16 +375,20 @@ struct ResultsView: View {
         router.replaceTop(with: .game(mode))
     }
 
-    /// Host-only: clears the finished game and pops back to a fresh
-    /// `LobbyView` push (mirroring `HomeView`'s own "Start Game" ->
-    /// `.lobby` navigation) so the host can pick any mode next, including a
-    /// different one. No wire message exists for this — see this file's
-    /// doc comment for why joiners only find out via the next
-    /// `.gameStart`.
+    /// Host-only: tells everyone the game is over, then clears the finished
+    /// game and pops back to a fresh `LobbyView` push (mirroring
+    /// `HomeView`'s own "Start Game" -> `.lobby` navigation) so the host can
+    /// pick any mode next, including a different one.
+    ///
+    /// The `.lobbyReturn` broadcast goes out *before* the local teardown so
+    /// joiners start moving at the same moment; the Multipeer session itself
+    /// is untouched, so nobody has to rediscover or re-invite anyone.
+    /// Joiners run the mirror image of the two lines below from
+    /// `ContentView`'s `lobbyReturnToken` observer.
     private func backToLobby() {
         guard isHost else { return }
-        engine.reset()
-        appState.currentGameState = .idle
+        sessionManager.broadcast(.lobbyReturn)
+        appState.returnToLobbyAfterHostReturn()
         router.popToRoot()
         router.navigate(to: .lobby)
     }
@@ -482,15 +496,20 @@ struct ResultsView: View {
 /// Builds preview `AppState` purely via `GameEngine.applyFollowerMessage(_:)`
 /// — the same mirroring path a joiner's `AppState` message routing uses —
 /// rather than driving a real `startGame()` round loop, since `ResultsView`
-/// only ever reads `finalScores`/`lastRoundResult`/`currentGameState`, none
-/// of which need a live round in progress to populate for the canvas.
+/// only ever reads `mode`/`finalScores`/`lastRoundResult`, none of which
+/// need a live round in progress to populate for the canvas.
+///
+/// The opening `.gameStart` matters: it is what sets `GameEngine.mode` on a
+/// follower, which is exactly what this screen's header and Vote Battle
+/// branch key off.
 @MainActor
 private func resultsPreviewAppState(
     mode: GameMode,
     isHost: Bool,
     scores: [PlayerScore],
     players: [Player],
-    highlightPlayerId: UUID? = nil
+    highlightPlayerId: UUID? = nil,
+    voteCounts: [UUID: Int]? = nil
 ) -> AppState {
     let appState = AppState()
     appState.gameSessionManager.isHost = isHost
@@ -499,9 +518,19 @@ private func resultsPreviewAppState(
     appState.gameSessionManager.roster.applyLobbyUpdate(players)
     appState.currentGameState = .playing(mode)
 
+    appState.gameEngine.applyFollowerMessage(
+        .gameStart(mode: mode, config: GameConfig.defaultConfig(for: mode, playerCount: players.count))
+    )
     if let highlightPlayerId {
         appState.gameEngine.applyFollowerMessage(
-            .roundResult(result: RoundResult(roundNumber: 5, scores: scores, highlightPlayerId: highlightPlayerId))
+            .roundResult(
+                result: RoundResult(
+                    roundNumber: 5,
+                    scores: scores,
+                    highlightPlayerId: highlightPlayerId,
+                    voteCounts: voteCounts
+                )
+            )
         )
     }
     appState.gameEngine.applyFollowerMessage(.gameEnd(scores: scores))
@@ -549,7 +578,8 @@ private let previewVoteScores = previewPlayers.map {
             isHost: true,
             scores: previewVoteScores,
             players: previewPlayers,
-            highlightPlayerId: previewJoiner1.id
+            highlightPlayerId: previewJoiner1.id,
+            voteCounts: [previewJoiner1.id: 2, previewJoiner2.id: 1]
         )
     )
     .environment(Router())

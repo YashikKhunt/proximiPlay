@@ -214,12 +214,20 @@ struct LobbyView: View {
     /// navigates locally.
     ///
     /// There is deliberately no live "host is previewing X" broadcast to
-    /// joiners as `selectedMode` changes — `Models/GameMessage.swift` is
-    /// shared with a concurrent agent building the game engine, so no new
-    /// case is added there. Joiners instead see a generic "Host is choosing
-    /// a game…" line until the real `.gameStart` arrives.
+    /// joiners as `selectedMode` changes — joiners see a generic "Host is
+    /// choosing a game…" line until the real `.gameStart` arrives.
+    ///
+    /// The broadcast config is built from the *actual* roster size, matching
+    /// what `GameHostView` hands the engine. Joiners now take their
+    /// `totalRounds` straight from this message
+    /// (`GameEngine.applyFollowerMessage`), so a player-count-blind config
+    /// here would show every joiner the wrong round count in Speed Draw,
+    /// whose round count is one per player.
     private func startGame() {
-        let config = GameConfig.defaultConfig(for: selectedMode)
+        let config = GameConfig.defaultConfig(
+            for: selectedMode,
+            playerCount: sessionManager.roster.players.count
+        )
         sessionManager.broadcast(.gameStart(mode: selectedMode, config: config))
         appState.currentGameState = .playing(selectedMode)
         router.navigate(to: .game(selectedMode))

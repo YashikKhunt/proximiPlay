@@ -9,6 +9,19 @@ struct HomeView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
 
+    /// Presents `NicknameEditorView`. A sheet rather than a `Router`
+    /// destination: editing your name is a self-contained detour off the
+    /// root, not part of the host/join flow the navigation stack models.
+    @State private var isEditingNickname = false
+
+    /// The name every nearby device will see. Read from the live
+    /// `myPlayer` (kept in step with the persisted nickname by
+    /// `GameSessionManager.updateNickname(_:)`), so returning from the
+    /// editor immediately shows the new value here.
+    private var nickname: String {
+        appState.gameSessionManager.myPlayer.displayName
+    }
+
     var body: some View {
         ZStack {
             // Background gradient
@@ -45,8 +58,10 @@ struct HomeView: View {
 
                 Spacer()
 
-                // Action buttons
+                // Identity + action buttons
                 VStack(spacing: 16) {
+                    nicknameRow
+
                     HomeActionButton(
                         title: "Start Game",
                         subtitle: "Host a game for nearby players",
@@ -77,6 +92,56 @@ struct HomeView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $isEditingNickname) {
+            NavigationStack {
+                NicknameEditorView()
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    // MARK: - Nickname
+
+    /// The edit affordance for the player's name, deliberately above the
+    /// Start/Join buttons: it's the one thing worth setting *before* a
+    /// session exists, and it's what everyone nearby will see.
+    private var nicknameRow: some View {
+        Button {
+            isEditingNickname = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "person.crop.circle")
+                    .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.indigo)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Playing as")
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary)
+                    Text(nickname)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+
+                Label("Edit", systemImage: "pencil")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.indigo)
+                    .labelStyle(.titleAndIcon)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(minHeight: 44)
+            .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit your name, currently \(nickname)")
+        .accessibilityHint("Changes the name other players see")
     }
 }
 

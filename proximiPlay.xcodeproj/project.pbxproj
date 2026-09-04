@@ -51,6 +51,7 @@
 		BB00000100000005AABBCC02 /* mostlikely.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000005AABBCC02 /* mostlikely.json */; };
 		BB00000100000006AABBCC02 /* wouldyourather.json in Resources */ = {isa = PBXBuildFile; fileRef = BB00000200000006AABBCC02 /* wouldyourather.json */; };
 		CA37B12EE52015CFCEDDF459 /* VoteGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31724A54B4210942D56EEE8 /* VoteGameView.swift */; };
+		CC00000100000001AABBCC03 /* NicknameEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00000200000001AABBCC03 /* NicknameEditorView.swift */; };
 		D05AEF4B6F7F4C0383C91F90 /* GameEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36511A62C2A5483193C1F642 /* GameEngine.swift */; };
 		EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183F02246B3748469E7AC70C /* ReflexGameView.swift */; };
 		EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E514E52689042D9980EB75F /* TriviaGameView.swift */; };
@@ -122,6 +123,7 @@
 		BB00000200000005AABBCC02 /* mostlikely.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = mostlikely.json; sourceTree = "<group>"; };
 		BB00000200000006AABBCC02 /* wouldyourather.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = wouldyourather.json; sourceTree = "<group>"; };
 		C7D9D9FD7382D9B8D6A48D9A /* PlayerRoster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerRoster.swift; sourceTree = "<group>"; };
+		CC00000200000001AABBCC03 /* NicknameEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NicknameEditorView.swift; sourceTree = "<group>"; };
 		D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingCanvasView.swift; sourceTree = "<group>"; };
 		F31724A54B4210942D56EEE8 /* VoteGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteGameView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -234,6 +236,7 @@
 			isa = PBXGroup;
 			children = (
 				474351E130497639001644A3 /* HomeView.swift */,
+				CC00000200000001AABBCC03 /* NicknameEditorView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -567,6 +570,7 @@
 				AA00000100000009AABBCC01 /* RoundResult.swift in Sources */,
 				AA0000010000000AAABBCC01 /* PlayerScore.swift in Sources */,
 				474351E330497639001644A3 /* HomeView.swift in Sources */,
+				CC00000100000001AABBCC03 /* NicknameEditorView.swift in Sources */,
 				474351DD30497603001644A3 /* AppState.swift in Sources */,
 				474351FB3049768C001644A3 /* ConnectionIndicator.swift in Sources */,
 				474351FC3049768C001644A3 /* PlayerBadge.swift in Sources */,

@@ -55,15 +55,12 @@ struct DrawGameView: View {
     private var engine: GameEngine { appState.gameEngine }
     private var myPlayerId: UUID { appState.gameSessionManager.myPlayer.id }
 
-    /// `GameEngine.totalRounds` is never populated on joiner devices (see
-    /// `TriviaGameView`'s identical fallback). Speed Draw's round count
-    /// depends on the roster size (one round per player), so this falls
-    /// back to the *current* roster size rather than a fixed constant.
-    private var totalRounds: Int {
-        if engine.totalRounds > 0 { return engine.totalRounds }
-        let playerCount = appState.gameSessionManager.roster.players.count
-        return GameConfig.defaultConfig(for: .speedDraw, playerCount: playerCount).roundCount
-    }
+    /// Host-authoritative on every device: the host sets this in
+    /// `startGame`, joiners mirror it from the host's `.gameStart`
+    /// (`GameEngine.applyFollowerMessage`). Speed Draw's round count tracks
+    /// the roster size, so the old local `GameConfig` guess was the one
+    /// most likely to disagree with the host outright.
+    private var totalRounds: Int { engine.totalRounds }
 
     private var currentDrawPayload: DrawPayload? {
         guard case .draw(let word, let drawerId)? = engine.currentRound else { return nil }

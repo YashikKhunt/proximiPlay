@@ -11,6 +11,20 @@ import Foundation
 /// `decoded(from:)` for convenient serialization round-trips.
 nonisolated enum GameMessage: Codable, Sendable {
     case lobbyUpdate(players: [Player])
+    /// Host → one specific joiner: "this is the `Player` I assigned you."
+    ///
+    /// Sent point-to-point (never broadcast) the moment the host registers a
+    /// newly-connected peer in its roster, so the joiner adopts its identity
+    /// verbatim instead of trying to recognise itself inside a broadcast
+    /// roster. Guessing by `displayName` used to work only until two people
+    /// picked the same nickname, at which point both devices adopted the
+    /// same entry and one of them silently lost every input it sent (the
+    /// host validates `playerId` against the delivering `MCPeerID`).
+    ///
+    /// Host-authoritative and therefore origin-gated: only honoured when it
+    /// arrives from the joined host peer (`GameSessionManager.isFromHost`),
+    /// which is always `false` on the host itself.
+    case identityAssignment(player: Player)
     case gameStart(mode: GameMode, config: GameConfig)
     /// `round` is the host's `GameEngine.roundNumber` at the moment this
     /// round started, so followers can track the in-progress round number
@@ -31,6 +45,18 @@ nonisolated enum GameMessage: Codable, Sendable {
     case gameEnd(scores: [PlayerScore])
     case heartbeat(timestamp: Date)
     case disconnect(playerId: UUID)
+    /// Host → everyone: "the game is over, come back to the lobby."
+    ///
+    /// Broadcast when the host taps "Back to Lobby" on `ResultsView`. The
+    /// Multipeer session stays up — only the finished game is torn down —
+    /// so joiners return to `LobbyView` and wait for the next `.gameStart`
+    /// instead of sitting on stale final scores.
+    ///
+    /// Host-authoritative like `.gameStart`/`.roundStart`: honoured only
+    /// when `GameSessionManager.isFromHost` vouches for the sender, so a
+    /// joiner cannot yank everyone out of a game and the host can never be
+    /// made to follow its own message.
+    case lobbyReturn
 
     // MARK: - Serialization Helpers
 

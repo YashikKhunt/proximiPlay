@@ -249,10 +249,21 @@ final class GameEngine {
 
     // MARK: - Joiner: Follower State
 
-    /// Mirrors a host-broadcast `.roundStart`/`.roundResult`/`.gameEnd`
-    /// message into the same observable properties a host-side view would
-    /// read, so mode views render identically regardless of role. Every
-    /// other `GameMessage` case is ignored.
+    /// Mirrors a host-broadcast
+    /// `.gameStart`/`.roundStart`/`.roundResult`/`.gameEnd` message into the
+    /// same observable properties a host-side view would read, so mode views
+    /// render identically regardless of role. Every other `GameMessage` case
+    /// is ignored.
+    ///
+    /// `.gameStart` is what makes a follower's state *complete*: it carries
+    /// the `GameMode` and the round count, neither of which any later
+    /// message repeats. Without it, `mode` stayed `nil` and `totalRounds`
+    /// stayed `0` on every joiner, and each mode view had to paper over the
+    /// gap with its own `GameConfig.defaultConfig(...)` guess — a guess that
+    /// was silently wrong for Speed Draw, whose round count tracks the
+    /// roster size. It also clears the previous game, so the host's "Play
+    /// Again" doesn't leave stale `finalScores` making round 1 of the new
+    /// game look like the last round of the old one.
     ///
     /// Callers are expected to have already verified the message actually
     /// originates from the host (see `AppState`'s message-receive path) —
@@ -263,6 +274,11 @@ final class GameEngine {
     /// views and crash or misrender.
     func applyFollowerMessage(_ message: GameMessage) {
         switch message {
+        case .gameStart(let mode, let config):
+            reset()
+            self.mode = mode
+            totalRounds = max(config.roundCount, 0)
+
         case .roundStart(let data, let round):
             guard Self.isValidRoundData(data) else {
                 Self.logger.warning("Rejected structurally invalid .roundStart payload")
@@ -392,11 +408,25 @@ final class GameEngine {
             scores[playerId, default: 0] += delta
         }
 
-        let highlightId = computeHighlight(mode: mode, deltas: deltas)
+        // Vote Battle's per-player counts are the mode's whole payoff, so
+        // they ship with the result rather than being computed and thrown
+        // away host-side (which left `VoteRevealView` able to name a winner
+        // but never say by how much).
+        let voteCounts: [UUID: Int]? = {
+            guard case .voteBattle = mode else { return nil }
+            let counts = currentVoteTally()
+            return counts.isEmpty ? nil : counts
+        }()
+        let highlightId = computeHighlight(mode: mode, deltas: deltas, voteCounts: voteCounts)
         let scoreList = players.map {
             PlayerScore(playerId: $0.id, displayName: $0.displayName, score: scores[$0.id] ?? 0)
         }
-        let result = RoundResult(roundNumber: roundNumber, scores: scoreList, highlightPlayerId: highlightId)
+        let result = RoundResult(
+            roundNumber: roundNumber,
+            scores: scoreList,
+            highlightPlayerId: highlightId,
+            voteCounts: voteCounts
+        )
         lastRoundResult = result
         currentRound = nil
         sender.broadcast(.roundResult(result: result))
@@ -510,16 +540,25 @@ final class GameEngine {
         }
     }
 
-    private func computeHighlight(mode: GameMode, deltas: [UUID: Int]) -> UUID? {
+    /// This round's votes tallied per target, from the votes actually
+    /// recorded in `inputs`. Empty when nobody voted.
+    private func currentVoteTally() -> [UUID: Int] {
+        var votes: [UUID: UUID] = [:]
+        for player in players {
+            if case .vote(let targetId)? = inputs[player.id] {
+                votes[player.id] = targetId
+            }
+        }
+        return Self.voteTally(votes: votes)
+    }
+
+    private func computeHighlight(mode: GameMode, deltas: [UUID: Int], voteCounts: [UUID: Int]?) -> UUID? {
         switch mode {
         case .voteBattle:
-            var votes: [UUID: UUID] = [:]
-            for player in players {
-                if case .vote(let targetId)? = inputs[player.id] {
-                    votes[player.id] = targetId
-                }
-            }
-            return Self.voteTally(votes: votes).max(by: { $0.value < $1.value })?.key
+            // Same tally that ships in the result — computed once, in
+            // `finishRound`, so the highlighted player and the counts every
+            // device renders can never disagree.
+            return voteCounts?.max(by: { $0.value < $1.value })?.key
         default:
             return deltas.max(by: { $0.value < $1.value })?.key
         }
