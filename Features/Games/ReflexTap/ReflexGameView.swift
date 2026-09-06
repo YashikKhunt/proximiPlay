@@ -110,7 +110,7 @@ struct ReflexGameView: View {
                 waitingView
             }
         }
-        .animation(.default, value: flow.reveal != nil)
+        .motion(Motion.arrival, value: flow.reveal != nil)
         .navigationTitle(GameMode.reflexTap.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -329,11 +329,6 @@ private struct ReflexPromptView: View {
     let phase: TapPhase
     var onTap: () -> Void = {}
 
-    // The app-wide mirror rather than SwiftUI's own key, so there is a
-    // single source of truth for Reduce Motion and this view is previewable
-    // in both states. ContentView feeds the mirror from the real key.
-    @Environment(\.motionReduceMotion) private var reduceMotion
-
     var body: some View {
         ZStack {
             backgroundColor.ignoresSafeArea()
@@ -388,7 +383,7 @@ private struct ReflexPromptView: View {
         // Reduce Motion: an instant cut between phases rather than a
         // cross-fade, so nothing strobes -- the color/label change is still
         // obvious, just not animated.
-        .animation(reduceMotion ? nil : .easeIn(duration: 0.12), value: phase)
+        .motion(.easeIn(duration: 0.12), value: phase)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(isTappable ? .isButton : [])

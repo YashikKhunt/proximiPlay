@@ -23,7 +23,11 @@ struct ConnectionIndicator: View {
                 .fill(stateColor)
                 .frame(width: 8, height: 8)
                 .opacity(isPulsing ? (pulseTick ? 0.3 : 1.0) : 1.0)
-                .animation(
+                // A repeatForever pulse is exactly the kind of perpetual
+                // motion Reduce Motion exists to stop; the dot's colour
+                // already carries the state, so losing the pulse costs no
+                // information.
+                .motion(
                     isPulsing
                         ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
                         : .default,

@@ -83,7 +83,7 @@ struct DrawGameView: View {
                 waitingView
             }
         }
-        .animation(.default, value: flow.reveal != nil)
+        .motion(Motion.arrival, value: flow.reveal != nil)
         .navigationTitle(GameMode.speedDraw.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

@@ -66,7 +66,7 @@ struct VoteGameView: View {
                 waitingView
             }
         }
-        .animation(.default, value: flow.reveal != nil)
+        .motion(Motion.arrival, value: flow.reveal != nil)
         .navigationTitle(GameMode.voteBattle.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -233,7 +233,7 @@ private struct VotePlayerCard: View {
             .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: state)
+        .motion(Motion.emphasis, value: state)
         .disabled(state == .locked)
         .opacity(state == .locked ? 0.5 : 1.0)
         .accessibilityLabel(accessibilityLabel)

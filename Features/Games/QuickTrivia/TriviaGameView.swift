@@ -72,7 +72,7 @@ struct TriviaGameView: View {
                 waitingView
             }
         }
-        .animation(.default, value: flow.reveal != nil)
+        .motion(Motion.arrival, value: flow.reveal != nil)
         .navigationTitle(GameMode.quickTrivia.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
