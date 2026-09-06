@@ -522,6 +522,168 @@ struct GameEngineFollowerTests {
     }
 }
 
+// MARK: - Game Duration Tracking
+
+/// `GameHistory.duration` used to be approximated at the `ResultsView` call
+/// site as `rounds actually played × that mode's per-round time budget` —
+/// systematically wrong whenever a round finished early (the common case).
+/// These pin `GameEngine`'s real wall-clock tracking that replaces it.
+@MainActor
+struct GameEngineDurationTests {
+
+    @Test func startGameStampsGameStartedAt() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+
+        #expect(engine.gameStartedAt == nil)
+        engine.startGame(mode: .quickTrivia, roster: makePlayers(2), config: GameConfig(roundCount: 1, timePerRound: 20))
+        #expect(engine.gameStartedAt != nil)
+    }
+
+    @Test func lastGameDurationIsNilUntilTheGameEnds() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        engine.startGame(mode: .quickTrivia, roster: makePlayers(2), config: GameConfig(roundCount: 5, timePerRound: 20))
+
+        #expect(engine.lastGameDuration == nil)
+    }
+
+    @Test func lastGameDurationIsSetOnceTheGameEnds() async throws {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(2)
+        engine.startGame(mode: .quickTrivia, roster: players, config: GameConfig(roundCount: 1, timePerRound: 20))
+
+        guard case .trivia(_, _, let correctIndex)? = roundStartData(sender.sentMessages, round: 1) else {
+            Issue.record("Missing round 1 data")
+            return
+        }
+        // A brief real delay so the measured duration is unambiguously > 0,
+        // not just "not nil".
+        try await Task.sleep(for: .milliseconds(20))
+        engine.submitInput(playerId: players[0].id, input: .triviaAnswer(index: correctIndex, timestamp: Date()))
+        engine.submitInput(playerId: players[1].id, input: .triviaAnswer(index: correctIndex, timestamp: Date()))
+
+        #expect(!engine.isRunning)
+        let duration = try #require(engine.lastGameDuration)
+        #expect(duration > 0)
+    }
+
+    @Test func resetClearsDurationTracking() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        engine.startGame(mode: .quickTrivia, roster: makePlayers(2), config: GameConfig(roundCount: 1, timePerRound: 20))
+
+        engine.reset()
+
+        #expect(engine.gameStartedAt == nil)
+        #expect(engine.lastGameDuration == nil)
+    }
+
+    @Test func followerStampsGameStartedAtFromGameStartAndDurationFromGameEnd() async throws {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+
+        engine.applyFollowerMessage(.gameStart(mode: .quickTrivia, config: GameConfig(roundCount: 1, timePerRound: 20)))
+        #expect(engine.gameStartedAt != nil)
+        #expect(engine.lastGameDuration == nil)
+
+        try await Task.sleep(for: .milliseconds(20))
+        engine.applyFollowerMessage(.gameEnd(scores: []))
+
+        let duration = try #require(engine.lastGameDuration)
+        #expect(duration > 0)
+    }
+}
+
+// MARK: - Bundled Content Pack Reachability
+
+/// `ContentPackTests` only proves every bundled pack decodes and validates —
+/// it never asserts anything actually *plays* it. These prove the packs
+/// `GameEngine` builds its live decks from at runtime
+/// (`mergedTriviaDeck()`/`mergedVotePromptDeck()`) genuinely include content
+/// from every bundled pack, not just the first one `prepareContent` used to
+/// load.
+@MainActor
+struct GameEngineContentPackReachabilityTests {
+
+    @Test func mergedTriviaDeckReachesEveryBundledPack() throws {
+        let general = try ContentPackLoader.loadTriviaPack(named: "general")
+        let popCulture = try ContentPackLoader.loadTriviaPack(named: "popculture")
+        #expect(!general.isEmpty)
+        #expect(!popCulture.isEmpty)
+
+        var merged = try #require(GameEngine.mergedTriviaDeck(), "Merged trivia deck should not be nil when every pack loads")
+
+        // Every question from both source packs is present in the merged
+        // pool `GameEngine` actually draws rounds from — not just whichever
+        // pack happened to load first.
+        #expect(merged.count == general.count + popCulture.count)
+        var mergedTexts: Set<String> = []
+        for _ in 0..<merged.count { mergedTexts.insert(merged.draw().text) }
+        for question in general { #expect(mergedTexts.contains(question.text)) }
+        for question in popCulture { #expect(mergedTexts.contains(question.text)) }
+    }
+
+    @Test func mergedVotePromptDeckReachesEveryBundledPack() throws {
+        let mostLikely = try ContentPackLoader.loadVotePromptPack(named: "mostlikely")
+        let wouldYouRather = try ContentPackLoader.loadVotePromptPack(named: "wouldyourather")
+        #expect(!mostLikely.isEmpty)
+        #expect(!wouldYouRather.isEmpty)
+
+        var merged = try #require(GameEngine.mergedVotePromptDeck(), "Merged vote prompt deck should not be nil when every pack loads")
+
+        #expect(merged.count == mostLikely.count + wouldYouRather.count)
+        var mergedTexts: Set<String> = []
+        for _ in 0..<merged.count { mergedTexts.insert(merged.draw().text) }
+        for prompt in mostLikely { #expect(mergedTexts.contains(prompt.text)) }
+        for prompt in wouldYouRather { #expect(mergedTexts.contains(prompt.text)) }
+    }
+
+    /// End-to-end through the actual gameplay path (`startGame` →
+    /// `.roundStart` broadcasts), rather than inspecting the deck in
+    /// isolation: draws a full pass of Quick Trivia rounds and confirms the
+    /// questions the engine actually *broadcasts* include ones unique to
+    /// each bundled pack, so a played game demonstrably surfaces both.
+    @Test func fullTriviaGamePlaysQuestionsFromBothBundledPacks() throws {
+        let general = try ContentPackLoader.loadTriviaPack(named: "general")
+        let popCulture = try ContentPackLoader.loadTriviaPack(named: "popculture")
+        let generalTexts = Set(general.map(\.text))
+        let popCultureTexts = Set(popCulture.map(\.text))
+
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(2)
+        // One full pass over the merged deck guarantees (via `ShuffledDeck`'s
+        // draw-without-replacement contract) every question is drawn exactly
+        // once before any repeat, so this necessarily surfaces content from
+        // both packs rather than depending on luck.
+        let totalQuestions = general.count + popCulture.count
+        let config = GameConfig(roundCount: totalQuestions, timePerRound: 20)
+        engine.startGame(mode: .quickTrivia, roster: players, config: config)
+
+        for round in 1...totalQuestions {
+            guard case .trivia? = roundStartData(sender.sentMessages, round: round) else {
+                Issue.record("Missing .roundStart for round \(round)")
+                continue
+            }
+            for player in players {
+                engine.submitInput(playerId: player.id, input: .triviaAnswer(index: 0, timestamp: Date()))
+            }
+        }
+
+        let broadcastTexts: Set<String> = Set(sender.sentMessages.compactMap { message in
+            if case .roundStart(let data, _) = message, case .trivia(let question, _, _) = data {
+                return question
+            }
+            return nil
+        })
+
+        #expect(!broadcastTexts.isDisjoint(with: generalTexts))
+        #expect(!broadcastTexts.isDisjoint(with: popCultureTexts))
+    }
+}
+
 // MARK: - Pure Scoring Functions
 
 struct GameEngineScoringTests {

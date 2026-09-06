@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		10116A2B78A44224BF7322EC /* winner_reveal.wav in Resources */ = {isa = PBXBuildFile; fileRef = 8D2D0051C681490FB4E68DDE /* winner_reveal.wav */; };
+		11D6EB65C3664742894F9231 /* ShareCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A236628151C445BB96D1AB9A /* ShareCardView.swift */; };
+		11F9FED6E571E0D5045F859E /* PlayerStatsBatchLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE59785AC9BA02A2F911D96 /* PlayerStatsBatchLoader.swift */; };
 		1FEDB35824B747AC85B290AC /* DrawingCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E2D2A0E99040A1975EB2E9 /* DrawingCanvasView.swift */; };
 		233902AB062647249617B2DC /* player_joined.wav in Resources */ = {isa = PBXBuildFile; fileRef = DC95628EEA8A4B41B98CC0A5 /* player_joined.wav */; };
 		247DEBD8B46F47BD9CE53303 /* selection.wav in Resources */ = {isa = PBXBuildFile; fileRef = C4428BF055AE4EABA926644C /* selection.wav */; };
@@ -129,6 +131,7 @@
 		8D2D0051C681490FB4E68DDE /* winner_reveal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = winner_reveal.wav; sourceTree = "<group>"; };
 		8D61D4697375430B81F4993C /* StrokeSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeSync.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F60718293A4B6 /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
+		A236628151C445BB96D1AB9A /* ShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardView.swift; sourceTree = "<group>"; };
 		AA00000200000001AABBCC01 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
 		AA00000200000002AABBCC01 /* PlayerColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerColor.swift; sourceTree = "<group>"; };
 		AA00000200000003AABBCC01 /* GameMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameMode.swift; sourceTree = "<group>"; };
@@ -154,6 +157,7 @@
 		DC95628EEA8A4B41B98CC0A5 /* player_joined.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = player_joined.wav; sourceTree = "<group>"; };
 		DDCF95C61DD54A34ADD5CDDA /* HapticEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticEngine.swift; sourceTree = "<group>"; };
 		F31724A54B4210942D56EEE8 /* VoteGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoteGameView.swift; sourceTree = "<group>"; };
+		FDE59785AC9BA02A2F911D96 /* PlayerStatsBatchLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerStatsBatchLoader.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -359,6 +363,7 @@
 			isa = PBXGroup;
 			children = (
 				1AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift */,
+				A236628151C445BB96D1AB9A /* ShareCardView.swift */,
 			);
 			path = Results;
 			sourceTree = "<group>";
@@ -398,6 +403,7 @@
 			children = (
 				474351D1304974F3001644A3 /* GameHistory.swift */,
 				474351D2304974F3001644A3 /* PlayerStats.swift */,
+				FDE59785AC9BA02A2F911D96 /* PlayerStatsBatchLoader.swift */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -652,6 +658,7 @@
 				474351DE30497603001644A3 /* Router.swift in Sources */,
 				474351D7304974F3001644A3 /* PlayerStats.swift in Sources */,
 				474351D8304974F3001644A3 /* GameHistory.swift in Sources */,
+				11F9FED6E571E0D5045F859E /* PlayerStatsBatchLoader.swift in Sources */,
 				AA0000010000000BAABBCC01 /* CodablePoint.swift in Sources */,
 				BB00000100000001AABBCC02 /* ContentPack.swift in Sources */,
 				BB00000100000002AABBCC02 /* ContentPackLoader.swift in Sources */,
@@ -669,6 +676,7 @@
 				5ACC251C724F4C90AB46BCF7 /* GuessInputView.swift in Sources */,
 				EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */,
 				2AB4C4E1B36F4E2E9B8A6D01 /* ResultsView.swift in Sources */,
+				11D6EB65C3664742894F9231 /* ShareCardView.swift in Sources */,
 				6456B8C7ED367E9C70F0015C /* RoundHeaderView.swift in Sources */,
 				2F259B499DBA10854D9C1010 /* LeaveGameGuard.swift in Sources */,
 				9A1B2C3D4E5F60718293A4B5 /* Motion.swift in Sources */,

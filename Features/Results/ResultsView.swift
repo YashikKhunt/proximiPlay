@@ -56,6 +56,7 @@ struct ResultsView: View {
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var modelContext
     @Environment(\.motionReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Guards `persistIfNeeded()` against re-entry (e.g. a second
     /// `onAppear` from a SwiftUI re-render) so at most one `GameHistory`
@@ -64,6 +65,11 @@ struct ResultsView: View {
     /// Drives the winner crown / header-icon spring entrance across the
     /// whole screen, flipped once in `onAppear`.
     @State private var animateReveal = false
+    /// The rasterized `ShareCardView`, produced once scores land (see
+    /// `renderShareCard()`) and handed to the toolbar `ShareLink`. `nil`
+    /// while rendering hasn't happened yet — the toolbar shows a spinner
+    /// rather than a button that would do nothing if tapped.
+    @State private var shareImage: UIImage?
 
     private var engine: GameEngine { appState.gameEngine }
     private var sessionManager: GameSessionManager { appState.gameSessionManager }
@@ -115,14 +121,23 @@ struct ResultsView: View {
         }
         .navigationTitle("Results")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                shareButton
+            }
+        }
         .statusBannerOverlay(reconnectingBanner)
         .hostLeftAlert()
         .onAppear {
             persistIfNeeded()
             triggerCelebration()
+            renderShareCard()
         }
         .onChange(of: sessionManager.lastGameStartToken) { _, _ in
             handleGameStartRebroadcast()
+        }
+        .onChange(of: colorScheme) { _, _ in
+            renderShareCard()
         }
     }
 
@@ -398,6 +413,110 @@ struct ResultsView: View {
         }
     }
 
+    // MARK: - Share
+
+    /// Lives in the navigation bar rather than alongside `actions` on
+    /// purpose: `actions` is role-dependent (host gets Play Again/Back to
+    /// Lobby, a joiner gets a waiting hint), but sharing the final
+    /// scoreboard is something *everyone* on the call should be able to do,
+    /// and a toolbar item can't be mistaken for "the host's button" the way
+    /// a third stacked action under Play Again could be. It also can't
+    /// compete for attention with Play Again the way a same-list action
+    /// would — it's off to the side, always in the same place.
+    ///
+    /// Shows a small spinner instead of a dead button while
+    /// `renderShareCard()` hasn't produced an image yet (rendering is
+    /// synchronous and near-instant, but scores could in principle arrive a
+    /// beat after the screen appears).
+    @ViewBuilder
+    private var shareButton: some View {
+        if let shareImage {
+            ShareLink(
+                item: Image(uiImage: shareImage),
+                preview: SharePreview(shareTitle, image: Image(uiImage: shareImage))
+            ) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share results")
+            .accessibilityHint("Shares an image of the final scoreboard")
+        } else {
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var shareTitle: String {
+        "\(mode?.displayName ?? "Game") Results"
+    }
+
+    /// Every row `ShareCardView` draws, resolved from `finalScores` (for
+    /// display names/order) joined against the roster (for colour) exactly
+    /// like `standingRow`/`voteBattleRow` above already do — just packaged
+    /// into the card's simpler, engine-independent `ShareCardEntry`.
+    private var shareCardEntries: [ShareCardEntry] {
+        if isVoteBattle {
+            let lastRound = engine.lastRoundResult
+            return finalScores.map { score in
+                let player = sessionManager.roster.players.first { $0.id == score.playerId }
+                let votes = lastRound?.voteCounts != nil ? lastRound?.voteCount(for: score.playerId) ?? 0 : 0
+                return ShareCardEntry(
+                    id: score.playerId,
+                    displayName: score.displayName,
+                    color: player?.color ?? .blue,
+                    value: votes,
+                    isHighlighted: lastRound?.highlightPlayerId == score.playerId
+                )
+            }
+        } else {
+            return rankedScores.map { ranked in
+                let player = sessionManager.roster.players.first { $0.id == ranked.playerId }
+                return ShareCardEntry(
+                    id: ranked.playerId,
+                    displayName: ranked.displayName,
+                    color: player?.color ?? .blue,
+                    value: ranked.score,
+                    isHighlighted: ranked.score == topScore
+                )
+            }
+        }
+    }
+
+    /// See `RoundResult.voteCounts`'s doc comment: Vote Battle awards no
+    /// points, so the card states that plainly rather than rendering an
+    /// all-zero scoreboard that would read as a scoring bug.
+    private var shareCardSubtitle: String? {
+        isVoteBattle ? "Votes are just for fun — no points awarded." : nil
+    }
+
+    private var shareCard: ShareCardView? {
+        guard let mode else { return nil }
+        return ShareCardView(
+            mode: mode,
+            isVoteBattle: isVoteBattle,
+            entries: shareCardEntries,
+            subtitle: shareCardSubtitle
+        )
+    }
+
+    /// Rasterizes the card once final scores (and `mode`) are available.
+    /// Re-run on colour scheme changes so a card rendered right as the
+    /// system switches appearance still matches what's currently on
+    /// screen. Deliberately *not* re-run by "Play Again"/"Back to Lobby" —
+    /// see those actions' doc comments: this screen navigates away before
+    /// either takes effect, so there's no stale image to worry about, and
+    /// nothing here touches the session or engine either way. Cancelling
+    /// the resulting share sheet is a pure UIKit sheet dismissal with no
+    /// completion handler wired to any of this app's state, so scores and
+    /// the session are untouched by a cancel.
+    private func renderShareCard() {
+        guard !finalScores.isEmpty, let shareCard else {
+            shareImage = nil
+            return
+        }
+        shareImage = shareCard.rendered(colorScheme: colorScheme)
+    }
+
     private var leaveGameButton: some View {
         Button {
             appState.leaveSession()
@@ -496,34 +615,49 @@ struct ResultsView: View {
             winnerName: winnerNames.isEmpty ? nil : winnerNames.joined(separator: " & "),
             myScore: myScore,
             rounds: max(engine.roundNumber, 1),
-            duration: estimatedDuration(for: mode)
+            duration: gameDuration(for: mode)
         )
         modelContext.insert(history)
 
+        // One fetch for every finishing player, not one per player: the old
+        // loop issued up to 8 synchronous `FetchDescriptor`s on the main
+        // thread at the exact moment the celebration animation starts.
+        let existing = (try? PlayerStatsBatchLoader.existingStats(
+            for: finalScores.map(\.displayName),
+            in: modelContext
+        )) ?? [:]
+
         for score in finalScores {
-            upsertPlayerStats(for: score, isWinner: !isVoteBattle && score.score == topScore, mode: mode)
+            upsertPlayerStats(
+                for: score,
+                isWinner: !isVoteBattle && score.score == topScore,
+                mode: mode,
+                existing: existing[score.displayName]
+            )
         }
 
         try? modelContext.save()
     }
 
-    /// `GameEngine` tracks no overall wall-clock start time (only
-    /// per-round timestamps used for scoring), so a precise game duration
-    /// isn't available without an engine change out of this task's scope.
-    /// This approximates it as rounds actually played times that mode's
-    /// per-round time budget — a defensible estimate, not a real
-    /// stopwatch reading.
-    private func estimatedDuration(for mode: GameMode) -> TimeInterval {
+    /// The real elapsed time from `GameEngine`, which stamps a start on
+    /// `startGame`/`.gameStart` and captures the duration once when the game
+    /// actually ends (so it doesn't keep growing while someone lingers here).
+    ///
+    /// Falls back to the old rounds x per-round-budget estimate only if the
+    /// engine has no timestamp — e.g. a joiner that missed `.gameStart`.
+    private func gameDuration(for mode: GameMode) -> TimeInterval {
+        if let measured = engine.lastGameDuration { return measured }
         let config = GameConfig.defaultConfig(for: mode, playerCount: max(finalScores.count, 1))
         return config.timePerRound * Double(max(engine.roundNumber, 1))
     }
 
-    private func upsertPlayerStats(for score: PlayerScore, isWinner: Bool, mode: GameMode) {
-        let name = score.displayName
-        var descriptor = FetchDescriptor<PlayerStats>(predicate: #Predicate { $0.displayName == name })
-        descriptor.fetchLimit = 1
-
-        if let existing = try? modelContext.fetch(descriptor), let stats = existing.first {
+    private func upsertPlayerStats(
+        for score: PlayerScore,
+        isWinner: Bool,
+        mode: GameMode,
+        existing: PlayerStats?
+    ) {
+        if let stats = existing {
             stats.gamesPlayed += 1
             if isWinner { stats.gamesWon += 1 }
             stats.totalScore += score.score
@@ -531,7 +665,7 @@ struct ResultsView: View {
             stats.lastPlayedDate = Date()
         } else {
             let stats = PlayerStats(
-                displayName: name,
+                displayName: score.displayName,
                 gamesPlayed: 1,
                 gamesWon: isWinner ? 1 : 0,
                 totalScore: score.score,

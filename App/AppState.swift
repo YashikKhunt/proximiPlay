@@ -54,6 +54,79 @@ private final class StrokeRateLimiter {
     }
 }
 
+/// Relays outbound Speed Draw stroke batches to the host's fellow peers off
+/// the main actor, while still sending them to the network in the exact
+/// order they were enqueued.
+///
+/// ## Why off the main actor
+///
+/// `GameSessionManager.send(_:to:mode:)` is `nonisolated`, but calling a
+/// `nonisolated` function from `@MainActor` code does not itself hop off the
+/// main thread — it runs inline, on whatever actor/thread the caller is on.
+/// Before this type existed, the relay call in `AppState`'s
+/// `onMessageReceived` closure (itself invoked on `@MainActor` from
+/// `GameSessionManager.receive(_:from:)`) ran the JSON encode and
+/// `MCSession.send` synchronously on the main thread, up to ~20-25
+/// batches/sec during Speed Draw (`StrokeRateLimiter` caps it there),
+/// competing with SwiftUI's own main-thread work.
+///
+/// ## Why ordering still holds
+///
+/// Stroke batches render as independent polyline segments
+/// (`StrokeSync.receive(points:)`), appended in **receive order** — there is
+/// no sequence number on the wire to re-sort by, so out-of-order delivery
+/// renders as a visibly scrambled drawing. Simply spawning a bare
+/// `Task { sessionManager.send(...) }` per batch would not preserve that:
+/// distinct `Task`s of equal priority are not guaranteed by the Swift
+/// concurrency runtime to run in the order they were created, since ready
+/// tasks are picked up by whichever thread in the cooperative pool is free
+/// next.
+///
+/// This type sidesteps that by never spawning a task per batch. `enqueue`
+/// is a synchronous, non-suspending call — `AsyncStream.Continuation
+/// .yield(_:)` is documented to buffer values in call order — made directly
+/// from the main actor, so the enqueue order is exactly the order
+/// `onMessageReceived` validated (drawer check + throttle) the batches in.
+/// A single long-lived consumer `Task`, started once in `init`, then drains
+/// that buffer with `for await` — one item fully sent before the next is
+/// even pulled off the stream — so batches reach `MCSession.send` in the
+/// same order they were enqueued. That serial, one-at-a-time drain is what
+/// actually guarantees order here, not any property of task scheduling.
+private final class StrokeRelay: Sendable {
+    private struct Job: Sendable {
+        let message: GameMessage
+        let peers: [MCPeerID]
+    }
+
+    private let continuation: AsyncStream<Job>.Continuation
+    private let consumerTask: Task<Void, Never>
+
+    init(sender: GameSessionManager) {
+        let (stream, continuation) = AsyncStream<Job>.makeStream()
+        self.continuation = continuation
+        // .utility, matching ConnectionMonitor's heartbeat loop: real-time
+        // enough for drawing to feel live, but never competing with the main
+        // actor's UI work for priority.
+        self.consumerTask = Task.detached(priority: .utility) { [sender] in
+            for await job in stream {
+                sender.send(job.message, to: job.peers, mode: .unreliable)
+            }
+        }
+    }
+
+    deinit {
+        continuation.finish()
+        consumerTask.cancel()
+    }
+
+    /// Enqueues one relay job. Synchronous and non-suspending, so it is safe
+    /// to call directly from the main-actor message-receive path without
+    /// ever blocking on the network send.
+    func enqueue(_ message: GameMessage, to peers: [MCPeerID]) {
+        continuation.yield(Job(message: message, peers: peers))
+    }
+}
+
 /// The top-level application state, injected into the environment at app startup.
 ///
 /// Owns the networking and connection-monitoring singletons so that any view
@@ -93,6 +166,7 @@ final class AppState {
         let sessionManager = gameSessionManager
         let strokeSync = strokeSync
         let strokeThrottle = StrokeRateLimiter()
+        let strokeRelay = StrokeRelay(sender: sessionManager)
         gameSessionManager.onMessageReceived = { [weak sessionManager] message, peerID in
             guard let sessionManager else { return }
             switch message {
@@ -122,11 +196,15 @@ final class AppState {
                     // The host also relays to every other connected peer,
                     // since this app's Multipeer session is star-shaped: a
                     // joiner-drawer can only reach the host directly, not
-                    // its fellow joiners.
+                    // its fellow joiners. The throttle/drawer checks above
+                    // already ran on the main actor; only the encode +
+                    // `MCSession.send` itself moves off it, via `strokeRelay`
+                    // (see its doc comment for why this still preserves
+                    // relay order).
                     if sessionManager.isHost {
                         let relayTargets = sessionManager.connectedPeers.filter { $0 != peerID }
                         if !relayTargets.isEmpty {
-                            sessionManager.send(message, to: relayTargets, mode: .unreliable)
+                            strokeRelay.enqueue(message, to: relayTargets)
                         }
                     }
                 } else if sessionManager.isHost {

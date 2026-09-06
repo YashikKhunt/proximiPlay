@@ -71,6 +71,30 @@ final class GameEngine {
     /// received (joiner).
     private(set) var finalScores: [PlayerScore]?
 
+    /// Wall-clock time this game actually began — the host stamps it in
+    /// `startGame`; a joiner stamps its own local receipt of `.gameStart`
+    /// (`applyFollowerMessage`), which lands microseconds to a few hundred
+    /// milliseconds after the host's own timestamp but is otherwise
+    /// unavailable to a joiner, since `.gameStart` carries no timestamp of
+    /// its own. `nil` before a game starts and after `reset()`.
+    private(set) var gameStartedAt: Date?
+
+    /// The just-finished game's true elapsed wall-clock time, captured once
+    /// at the moment the game actually ended (`endGame()` on the host,
+    /// `.gameEnd` mirrored on a joiner) rather than computed lazily from
+    /// `gameStartedAt` whenever read — reading it lazily would keep growing
+    /// for as long as whoever's looking (e.g. `ResultsView`) lingers on the
+    /// results screen, which is not "how long the game took" at all.
+    /// `nil` until a game has actually ended, and cleared by `reset()`.
+    ///
+    /// Replaces the previous `rounds actually played × that mode's
+    /// per-round time budget` estimate used at the `GameHistory` call site —
+    /// an approximation that was systematically wrong for any round that
+    /// finished early (which is the common case: most rounds end the moment
+    /// every player has answered, well before the full per-round budget
+    /// elapses).
+    private(set) var lastGameDuration: TimeInterval?
+
     // MARK: - Host-only Bookkeeping
 
     private let sender: GameMessageSending
@@ -157,6 +181,8 @@ final class GameEngine {
         inputs = [:]
         inputReceivedAt = [:]
         isRunning = true
+        gameStartedAt = Date()
+        lastGameDuration = nil
 
         let resolvedConfig = overrideConfig ?? GameConfig.defaultConfig(for: mode, playerCount: roster.count)
         config = resolvedConfig
@@ -278,6 +304,7 @@ final class GameEngine {
             reset()
             self.mode = mode
             totalRounds = max(config.roundCount, 0)
+            gameStartedAt = Date()
 
         case .roundStart(let data, let round):
             guard Self.isValidRoundData(data) else {
@@ -297,6 +324,7 @@ final class GameEngine {
             self.finalScores = finalScores
             currentRound = nil
             isRunning = false
+            lastGameDuration = gameStartedAt.map { Date().timeIntervalSince($0) }
 
         default:
             break
@@ -316,6 +344,8 @@ final class GameEngine {
         currentRound = nil
         lastRoundResult = nil
         finalScores = nil
+        gameStartedAt = nil
+        lastGameDuration = nil
 
         config = nil
         players = []
@@ -339,15 +369,82 @@ final class GameEngine {
     private func prepareContent(for mode: GameMode) {
         switch mode {
         case .quickTrivia:
-            triviaDeck = try? ContentPackLoader.triviaDeck(named: "general")
+            triviaDeck = Self.mergedTriviaDeck()
         case .voteBattle:
-            voteDeck = try? ContentPackLoader.votePromptDeck(named: "mostlikely")
+            voteDeck = Self.mergedVotePromptDeck()
         case .speedDraw:
             wordDeck = ShuffledDeck(DrawWords.all)
             drawerQueue = players.map(\.id)
         case .reflexTap:
             break
         }
+    }
+
+    // MARK: - Host: Content Pack Merging
+
+    /// Every bundled trivia pack, merged into a single deck so a Quick
+    /// Trivia game draws from all of them rather than just `general` —
+    /// `popculture` shipped in `Resources/QuestionPacks/` and was tested for
+    /// decoding, but `prepareContent` never actually loaded it, so its
+    /// questions never reached a player. See `mergedVotePromptDeck()` for
+    /// why a merged pool (rather than picking one pack per game) is the
+    /// chosen strategy.
+    ///
+    /// `internal` (not `private`) purely so `GameEngineTests` can assert
+    /// this merged pool actually contains content from every pack — proving
+    /// reachability directly, rather than trusting that `prepareContent`
+    /// wires it up correctly by inspection alone. `nonisolated` — a plain
+    /// constant, not engine state — so those tests don't need `@MainActor`.
+    nonisolated static let triviaPackNames = ["general", "popculture"]
+
+    /// Every bundled vote-prompt pack, merged the same way as
+    /// `mergedTriviaDeck()` — `wouldyourather` shipped alongside
+    /// `mostlikely` but was never loaded by `prepareContent`.
+    nonisolated static let votePromptPackNames = ["mostlikely", "wouldyourather"]
+
+    /// Loads and concatenates every pack in `triviaPackNames`, then wraps
+    /// the combined pool in one `ShuffledDeck` — a **merged pool**, not a
+    /// per-game random pack pick. A per-game pick would need its own
+    /// persisted/broadcast choice (so every device agreed on which pack is
+    /// live) for no real benefit here: `VotePromptKind`-style categorization
+    /// isn't user-facing anywhere in the UI, so there is no "pick a
+    /// category" moment to hang a per-game selection off of. A merged pool
+    /// also means a single game already exercises content from every
+    /// bundled pack instead of only ever seeing whichever pack got picked,
+    /// and it degrades gracefully: a pack that fails to load (missing or
+    /// corrupt resource) is logged and skipped rather than failing the
+    /// whole draw, so one bad pack can't take every pack down with it.
+    ///
+    /// Returns `nil` (ending the game early via `makeRoundData`'s existing
+    /// "no round content available" path) only if every pack failed to
+    /// load.
+    nonisolated static func mergedTriviaDeck(bundle: Bundle = .main) -> ShuffledDeck<TriviaQuestion>? {
+        let questions = triviaPackNames.flatMap { name -> [TriviaQuestion] in
+            do {
+                return try ContentPackLoader.loadTriviaPack(named: name, bundle: bundle)
+            } catch {
+                logger.error("Skipping trivia pack \(name, privacy: .public): \(String(describing: error), privacy: .public)")
+                return []
+            }
+        }
+        guard !questions.isEmpty else { return nil }
+        return ShuffledDeck(questions)
+    }
+
+    /// Loads and concatenates every pack in `votePromptPackNames`. See
+    /// `mergedTriviaDeck()` for the merged-pool rationale, which applies
+    /// identically here.
+    nonisolated static func mergedVotePromptDeck(bundle: Bundle = .main) -> ShuffledDeck<VotePrompt>? {
+        let prompts = votePromptPackNames.flatMap { name -> [VotePrompt] in
+            do {
+                return try ContentPackLoader.loadVotePromptPack(named: name, bundle: bundle)
+            } catch {
+                logger.error("Skipping vote prompt pack \(name, privacy: .public): \(String(describing: error), privacy: .public)")
+                return []
+            }
+        }
+        guard !prompts.isEmpty else { return nil }
+        return ShuffledDeck(prompts)
     }
 
     private func runRound() {
@@ -444,6 +541,7 @@ final class GameEngine {
         roundTask = nil
         isRunning = false
         currentRound = nil
+        lastGameDuration = gameStartedAt.map { Date().timeIntervalSince($0) }
 
         let scoreList = players.map {
             PlayerScore(playerId: $0.id, displayName: $0.displayName, score: scores[$0.id] ?? 0)

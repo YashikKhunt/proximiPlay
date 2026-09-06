@@ -12,8 +12,29 @@ import XCTest
 
 final class LobbyScreenshotUITests: XCTestCase {
 
+    /// These are on-demand capture tools, not assertions about behaviour —
+    /// nothing here would catch a regression that `NavigationUITests` doesn't
+    /// already cover. Running them in every suite invocation just adds a
+    /// second UI-test class driving the app in a parallel clone, which is
+    /// flaky by construction (observed: this class failing in a full-suite
+    /// run while passing in isolation). So they skip entirely unless a
+    /// capture was actually asked for.
+    ///
+    /// Request one with:
+    ///   SIMCTL_CHILD_SCREENSHOT_DIR=/some/dir xcodebuild test \
+    ///     -only-testing:proximiPlayUITests/LobbyScreenshotUITests ...
+    /// (the SIMCTL_CHILD_ prefix is what forwards the variable into the
+    /// simulator-hosted test process; a bare export does not reach it).
+    private func screenshotDirectory() throws -> String {
+        guard let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] else {
+            throw XCTSkip("SCREENSHOT_DIR not set — frame capture not requested")
+        }
+        return dir
+    }
+
     @MainActor
     func testCaptureHostLobbyFrame() throws {
+        let directory = try screenshotDirectory()
         let app = XCUIApplication()
         app.launch()
 
@@ -23,7 +44,7 @@ final class LobbyScreenshotUITests: XCTestCase {
 
         // Let the mode picker settle before capturing.
         Thread.sleep(forTimeInterval: 1.0)
-        try capture(named: "lobby-host")
+        try capture(named: "lobby-host", into: directory)
     }
 
     /// Captures `JoinView`'s "still searching" state — no host is actually
@@ -32,6 +53,7 @@ final class LobbyScreenshotUITests: XCTestCase {
     /// after.
     @MainActor
     func testCaptureJoinSearchingFrame() throws {
+        let directory = try screenshotDirectory()
         let app = XCUIApplication()
         app.launch()
 
@@ -41,16 +63,15 @@ final class LobbyScreenshotUITests: XCTestCase {
 
         // Let browsing actually start before capturing.
         Thread.sleep(forTimeInterval: 1.0)
-        try capture(named: "join-searching")
+        try capture(named: "join-searching", into: directory)
     }
 
-    /// Writes `name`.png to `SCREENSHOT_DIR` when the orchestrator has set
-    /// it (skipped otherwise), and always keeps the same PNG as an
-    /// `XCTAttachment` on the test record — the latter is visible from any
-    /// `.xcresult` produced by this run (e.g. via `xcresulttool`) with no
-    /// extra environment plumbing required.
+    /// Writes `name`.png into `directory` and also keeps the same PNG as an
+    /// `XCTAttachment` on the test record, so the frame is recoverable from
+    /// the `.xcresult` (via `xcresulttool export attachments`) even if the
+    /// disk write path is unavailable.
     @MainActor
-    private func capture(named name: String) throws {
+    private func capture(named name: String, into directory: String) throws {
         let screenshot = XCUIScreen.main.screenshot()
 
         let attachment = XCTAttachment(screenshot: screenshot)
@@ -58,8 +79,7 @@ final class LobbyScreenshotUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
 
-        guard let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] else { return }
         try screenshot.pngRepresentation
-            .write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
+            .write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
     }
 }

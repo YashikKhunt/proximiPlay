@@ -105,7 +105,7 @@ struct LobbyView: View {
             // triggers `.onDisappear` — only treat this as a genuine
             // departure (not a mid-game push-cover) when we're not actively
             // playing. Mirrors JoinView's connected-guard pattern.
-            guard appState.currentGameState == .idle || appState.currentGameState == .lobby else { return }
+            guard appState.currentGameState == .idle else { return }
             appState.leaveSession()
         }
         // Joiner-side navigation trigger: the host drives its own navigation
