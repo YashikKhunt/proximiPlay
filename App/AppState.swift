@@ -4,7 +4,12 @@
 //
 
 import Foundation
-import MultipeerConnectivity
+// @preconcurrency: `MCPeerID` predates Sendable and is not annotated, but it
+// is an immutable identity object that Apple's own Multipeer APIs hand across
+// threads. `StrokeRelay.Job` carries peers to a detached consumer, so without
+// this the conformance is only satisfied by main-actor isolation — which is
+// exactly the isolation the relay exists to escape.
+@preconcurrency import MultipeerConnectivity
 import os
 
 /// Per-player minimum-interval throttle for inbound `.drawStroke` batches,
@@ -93,7 +98,11 @@ private final class StrokeRateLimiter {
 /// same order they were enqueued. That serial, one-at-a-time drain is what
 /// actually guarantees order here, not any property of task scheduling.
 private final class StrokeRelay: Sendable {
-    private struct Job: Sendable {
+    /// `nonisolated` because the consumer reads these fields from a
+    /// detached task: under the project's `SWIFT_DEFAULT_ACTOR_ISOLATION =
+    /// MainActor`, a plain struct's properties are main-actor isolated, which
+    /// is a warning today and an error in the Swift 6 language mode.
+    private nonisolated struct Job: Sendable {
         let message: GameMessage
         let peers: [MCPeerID]
     }
@@ -101,8 +110,22 @@ private final class StrokeRelay: Sendable {
     private let continuation: AsyncStream<Job>.Continuation
     private let consumerTask: Task<Void, Never>
 
+    /// Deepest relay backlog held before the oldest jobs are dropped.
+    ///
+    /// `AsyncStream`'s default policy is `.unbounded`, which would let the
+    /// queue grow without limit if `MCSession.send` ever ran slower than
+    /// batches arrive (a congested link, or many peers). The per-drawer
+    /// throttle already caps arrivals at ~25/sec, so this depth is about
+    /// 20 seconds of backlog — far past the point where unreliable stroke
+    /// data is still worth delivering. Dropping beats growing here: the
+    /// transport is `.unreliable` by design and the receiver's own segment
+    /// buffer is capped too, so a gap is already an expected outcome.
+    private static let maxBacklog = 512
+
     init(sender: GameSessionManager) {
-        let (stream, continuation) = AsyncStream<Job>.makeStream()
+        let (stream, continuation) = AsyncStream<Job>.makeStream(
+            bufferingPolicy: .bufferingOldest(Self.maxBacklog)
+        )
         self.continuation = continuation
         // .utility, matching ConnectionMonitor's heartbeat loop: real-time
         // enough for drawing to feel live, but never competing with the main
