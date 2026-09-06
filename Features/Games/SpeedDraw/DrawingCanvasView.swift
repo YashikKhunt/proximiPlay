@@ -121,25 +121,27 @@ struct DrawingCanvasView: View {
     // MARK: - Controls
 
     private var controls: some View {
+        // `minHeight: 44` is applied per-button (inside each label), not to
+        // the containing `HStack` — a frame on the stack only guarantees
+        // the *stack's* height, not each button's own hit area, which was
+        // actually landing around 40-42pt (vertical padding + label height)
+        // and missing the 44pt minimum touch target.
         HStack(spacing: 12) {
             Button(role: .destructive, action: clear) {
                 Label("Clear", systemImage: "trash")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
             .accessibilityHint("Erases the whole drawing for everyone")
 
             Button(action: undo) {
                 Label("Undo", systemImage: "arrow.uturn.backward")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
             .disabled(strokes.isEmpty && currentStroke.isEmpty)
             .accessibilityHint("Removes your last stroke")
         }
-        .frame(minHeight: 44)
     }
 
     // MARK: - Rendering

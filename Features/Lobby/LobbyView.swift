@@ -10,6 +10,8 @@ struct LobbyView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
     @Environment(\.motionReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     /// Host-only local selection — never synced live to joiners (see
     /// `startGame()` doc comment for why). Defaults to the first mode.
@@ -23,132 +25,28 @@ struct LobbyView: View {
         sessionManager.roster.players.filter { $0.id != sessionManager.myPlayer.id }
     }
 
+    /// Surfaced whenever any connected peer's heartbeat has been missing for
+    /// more than 5 seconds (`ConnectionMonitor.PeerHealth.lost`) — a real,
+    /// observed connectivity problem, not a guess. `PlayerBadge`'s own health
+    /// dot already reports this per-player; this banner is the "something is
+    /// actually wrong right now" heads-up that doesn't require scanning the
+    /// roster to notice. Clears itself the moment a heartbeat is heard again.
+    private var reconnectingBanner: StatusBanner? {
+        guard appState.connectionMonitor.isMonitoring,
+              appState.connectionMonitor.peerHealth.values.contains(.lost) else { return nil }
+        return StatusBanner(
+            tone: .warning,
+            systemImage: "wifi.exclamationmark",
+            message: "Connection lost — reconnecting…"
+        )
+    }
+
     var body: some View {
         List {
-            // MARK: - My Player Section
-            Section {
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(sessionManager.myPlayer.color.swiftUIColor)
-                        .frame(width: 36, height: 36)
-                        .overlay {
-                            Text(sessionManager.myPlayer.displayName.prefix(1).uppercased())
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                        }
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(sessionManager.myPlayer.displayName)
-                            .font(.headline)
-
-                        Text("You")
-                            .font(.caption)
-                            .foregroundStyle(Color.secondary)
-                    }
-
-                    Spacer()
-
-                    if sessionManager.isHost {
-                        Label("Host", systemImage: "crown.fill")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.indigo, in: Capsule())
-                            .accessibilityLabel("Host badge")
-                    }
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("You")
-            }
-
-            // MARK: - Connected Players Section
-            Section {
-                if otherPlayers.isEmpty {
-                    Label("No other players yet", systemImage: "person.2")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.secondary)
-                        .accessibilityLabel("No other players connected yet")
-                        .transition(playerRowTransition)
-                } else {
-                    ForEach(otherPlayers) { player in
-                        PlayerBadge(player: player, peerHealth: appState.peerHealth(for: player))
-                            .padding(.vertical, 4)
-                            .transition(playerRowTransition)
-                    }
-                }
-            } header: {
-                HStack {
-                    Text("Players")
-                    Spacer()
-                    Text("\(sessionManager.roster.players.count)/\(GameSessionManager.maxPlayers)")
-                        .monospacedDigit()
-                        .accessibilityLabel(
-                            "\(sessionManager.roster.players.count) of \(GameSessionManager.maxPlayers) players"
-                        )
-                }
-            }
-
+            myPlayerSection
+            connectedPlayersSection
             // MARK: - Host Controls / Waiting Message
-            if sessionManager.isHost {
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(GameMode.allCases) { mode in
-                                    GameModeCard(
-                                        mode: mode,
-                                        isSelected: mode == selectedMode
-                                    ) {
-                                        selectedMode = mode
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-
-                        Text(selectedMode.description)
-                            .font(.caption)
-                            .foregroundStyle(Color.secondary)
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    Text("Game Mode")
-                }
-
-                Section {
-                    Button {
-                        startGame()
-                    } label: {
-                        Text("Start Game")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(otherPlayers.isEmpty)
-                    .accessibilityLabel("Start Game")
-                    .accessibilityHint(
-                        otherPlayers.isEmpty
-                            ? "Requires at least one other player to join"
-                            : "Starts \(selectedMode.displayName) for everyone in the lobby"
-                    )
-                }
-            } else {
-                Section {
-                    HStack(spacing: 12) {
-                        ProgressView()
-                            .accessibilityHidden(true)
-                        Text("Host is choosing a game…")
-                            .foregroundStyle(Color.secondary)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Waiting for the host to choose and start a game")
-                }
-            }
+            hostControlsOrWaitingSection
         }
         // Players popping straight into (and out of) the list read as a
         // glitch, not a join — animate the roster's own arrivals/departures
@@ -160,6 +58,7 @@ struct LobbyView: View {
         // needs a `.transition` to know how to enter/exit rather than
         // simply popping).
         .motion(Motion.arrival, value: sessionManager.roster.players)
+        .statusBannerOverlay(reconnectingBanner)
         .navigationTitle("Game Lobby")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
@@ -219,6 +118,206 @@ struct LobbyView: View {
             appState.currentGameState = .playing(newMode)
             router.navigate(to: .game(newMode))
         }
+        // The roster mutating is already visible on screen (rows slide in
+        // and out via `playerRowTransition`), but nothing spoke it — a
+        // VoiceOver user got no signal that someone joined or left short of
+        // re-scanning the whole list. Diffing old vs. new here catches every
+        // roster change regardless of source (a peer connecting, a peer
+        // dropping mid-lobby) with no separate wiring per cause.
+        .onChange(of: sessionManager.roster.players) { oldPlayers, newPlayers in
+            announceRosterChanges(from: oldPlayers, to: newPlayers)
+        }
+    }
+
+    // MARK: - VoiceOver Roster Announcements
+
+    /// Posts an `AccessibilityNotification.Announcement` for every player who
+    /// joined or left between `oldPlayers` and `newPlayers`, so a VoiceOver
+    /// user hears roster changes as they happen instead of only discovering
+    /// them by re-navigating the list.
+    private func announceRosterChanges(from oldPlayers: [Player], to newPlayers: [Player]) {
+        let oldIds = Set(oldPlayers.map(\.id))
+        let newIds = Set(newPlayers.map(\.id))
+
+        for player in newPlayers where !oldIds.contains(player.id) {
+            AccessibilityNotification.Announcement("\(player.displayName) joined the lobby").post()
+        }
+        for player in oldPlayers where !newIds.contains(player.id) {
+            AccessibilityNotification.Announcement("\(player.displayName) left the lobby").post()
+        }
+    }
+
+    // MARK: - My Player Section
+
+    /// Pulled out of `body` (alongside every other top-level section here)
+    /// purely to keep the surrounding `List`'s single result-builder
+    /// expression small enough for the type checker to solve in reasonable
+    /// time — see `noOtherPlayersView`'s doc comment for the same rationale.
+    @ViewBuilder
+    private var myPlayerSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(sessionManager.myPlayer.color.swiftUIColor)
+                    .frame(width: 36, height: 36)
+                    .overlay {
+                        Text(sessionManager.myPlayer.displayName.prefix(1).uppercased())
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            // Same WCAG-derived choice PlayerBadge makes —
+                            // white fails AA on half the palette.
+                            .foregroundStyle(
+                                sessionManager.myPlayer.color.accessibleForeground(
+                                    for: colorScheme,
+                                    contrast: colorSchemeContrast
+                                )
+                            )
+                    }
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(sessionManager.myPlayer.displayName)
+                        .font(.headline)
+
+                    Text("You")
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary)
+                }
+
+                Spacer()
+
+                if sessionManager.isHost {
+                    Label("Host", systemImage: "crown.fill")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.indigo, in: Capsule())
+                        .accessibilityLabel("Host badge")
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("You")
+        }
+    }
+
+    // MARK: - Connected Players Section
+
+    /// Same extraction rationale as `myPlayerSection`.
+    @ViewBuilder
+    private var connectedPlayersSection: some View {
+        Section {
+            if otherPlayers.isEmpty {
+                noOtherPlayersView
+            } else {
+                ForEach(otherPlayers) { player in
+                    PlayerBadge(player: player, peerHealth: appState.peerHealth(for: player))
+                        .padding(.vertical, 4)
+                        .transition(playerRowTransition)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Players")
+                Spacer()
+                Text("\(sessionManager.roster.players.count)/\(GameSessionManager.maxPlayers)")
+                    .monospacedDigit()
+                    .accessibilityLabel(
+                        "\(sessionManager.roster.players.count) of \(GameSessionManager.maxPlayers) players"
+                    )
+            }
+        }
+    }
+
+    // MARK: - Host Controls / Waiting Message
+
+    /// The host's game-mode picker + Start Game button, or (for a joiner)
+    /// the "host is choosing" waiting message — pulled out of `body` into
+    /// its own `@ViewBuilder` for the same reason as `noOtherPlayersView`:
+    /// keeping `body`'s single `List` expression small enough for the type
+    /// checker to solve without timing out.
+    @ViewBuilder
+    private var hostControlsOrWaitingSection: some View {
+        if sessionManager.isHost {
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(GameMode.allCases) { mode in
+                                GameModeCard(
+                                    mode: mode,
+                                    isSelected: mode == selectedMode
+                                ) {
+                                    selectedMode = mode
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+
+                    Text(selectedMode.description)
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Game Mode")
+            }
+
+            Section {
+                Button {
+                    startGame()
+                } label: {
+                    Text("Start Game")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(otherPlayers.isEmpty)
+                .accessibilityLabel("Start Game")
+                .accessibilityHint(
+                    otherPlayers.isEmpty
+                        ? "Requires at least one other player to join"
+                        : "Starts \(selectedMode.displayName) for everyone in the lobby"
+                )
+            }
+        } else {
+            Section {
+                HStack(spacing: 12) {
+                    ProgressView()
+                        .accessibilityHidden(true)
+                    Text("Host is choosing a game…")
+                        .foregroundStyle(Color.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Waiting for the host to choose and start a game")
+            }
+        }
+    }
+
+    // MARK: - Empty Roster
+
+    /// Standardized on `ContentUnavailableView` to match `JoinView`'s empty
+    /// state (see this file's flagged inconsistency) and made actionable: a
+    /// device sitting on this screen already tapped Start Game or joined
+    /// someone else's, so the concrete next step is inviting more people,
+    /// not just naming the empty list. Pulled out of `body` into its own
+    /// `@ViewBuilder` — inlined, its multi-line `description` pushed the
+    /// surrounding `List`'s single result-builder expression past the type
+    /// checker's time budget.
+    @ViewBuilder
+    private var noOtherPlayersView: some View {
+        ContentUnavailableView(
+            "No Other Players Yet",
+            systemImage: "person.2",
+            description: Text(
+                "Ask a friend to open ProximiPlay on their iPhone and tap Join Game to find this game. Make sure both devices have Wi-Fi or Bluetooth turned on."
+            )
+        )
+        .listRowBackground(Color.clear)
+        .transition(playerRowTransition)
     }
 
     // MARK: - Player Row Motion
@@ -281,7 +380,14 @@ private struct GameModeCard: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: mode.sfSymbol)
-                    .font(.title2)
+                    // A fixed point size, not `.title2`: this is a small
+                    // decorative glyph inside a fixed 44x44 badge, and
+                    // `.title2` scaling with Dynamic Type at accessibility
+                    // sizes made the symbol outgrow (and clip against) that
+                    // fixed frame. `.system(size:)` never scales with
+                    // Dynamic Type, which is exactly what a glyph pinned to a
+                    // non-scaling badge needs.
+                    .font(.system(size: 20, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(isSelected ? .white : Color.indigo)
                     .frame(width: 44, height: 44)
@@ -365,6 +471,33 @@ private func lobbyPreviewAppState() -> AppState {
         LobbyView()
     }
     .environment(lobbyPreviewAppState())
+    .environment(Router())
+}
+
+/// Seeds one real `MCPeerID` (via `hostPlayerJoined`, the same path a live
+/// session uses) so `ConnectionMonitor.peerHealth` has something to key a
+/// `.lost` entry against, confirming `reconnectingBanner`'s
+/// `StatusBanner` renders atop the roster without disturbing its layout.
+#Preview("Reconnecting") {
+    NavigationStack {
+        LobbyView()
+    }
+    .environment({
+        let appState = AppState()
+        let host = Player(displayName: "Ari", color: .blue, isHost: true)
+        appState.gameSessionManager.isHost = true
+        appState.gameSessionManager.myPlayer = host
+        appState.gameSessionManager.roster.setHost(host)
+
+        let peer = MCPeerID(displayName: "Priyanka Chandrasekaran")
+        appState.gameSessionManager.roster.hostPlayerJoined(
+            peer: peer,
+            displayName: "Priyanka Chandrasekaran"
+        )
+        appState.connectionMonitor.peerHealth[peer] = .lost
+
+        return appState
+    }())
     .environment(Router())
 }
 

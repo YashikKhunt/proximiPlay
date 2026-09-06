@@ -63,7 +63,6 @@ struct PrimaryButton: View {
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.5 : 1.0)
         .accessibilityLabel(title)
-        .accessibilityAddTraits(isDisabled ? .isStaticText : [])
     }
 }
 

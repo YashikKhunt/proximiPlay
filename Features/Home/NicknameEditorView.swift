@@ -34,6 +34,8 @@ import SwiftUI
 struct NicknameEditorView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     /// Pre-filled with the current nickname every time the sheet opens, so
     /// reopening shows what's actually in use rather than a blank field.
@@ -135,7 +137,14 @@ struct NicknameEditorView: View {
                 .overlay {
                     Text(resolvedName.prefix(1).uppercased())
                         .font(.headline.bold())
-                        .foregroundStyle(.white)
+                        // Matches PlayerBadge: white fails AA on half the
+                        // palette, so the foreground is derived, not assumed.
+                        .foregroundStyle(
+                            appState.gameSessionManager.myPlayer.color.accessibleForeground(
+                                for: colorScheme,
+                                contrast: colorSchemeContrast
+                            )
+                        )
                 }
                 .accessibilityHidden(true)
 

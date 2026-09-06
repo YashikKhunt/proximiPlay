@@ -18,20 +18,30 @@ struct JoinView: View {
             Section {
                 switch sessionManager.connectionState {
                 case .browsing where sessionManager.discoveredHosts.isEmpty:
-                    // Empty state — still searching
+                    // Empty state — still searching. Names both what this
+                    // is waiting on (a host advertising nearby) and who can
+                    // end the wait (a friend tapping Start Game), so this
+                    // never reads as "the app might be stuck."
                     VStack(spacing: 16) {
                         ProgressView()
                             .accessibilityHidden(true)
-                        Text("Searching for nearby games...")
+                        Text("Searching for nearby games…")
                             .font(.subheadline)
+                            .foregroundStyle(Color.secondary)
+                            .multilineTextAlignment(.center)
+                        Text("Ask a friend to open ProximiPlay and tap Start Game on their iPhone.")
+                            .font(.caption)
                             .foregroundStyle(Color.secondary)
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
                     .padding(.vertical, 24)
                     .listRowBackground(Color.clear)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Searching for nearby games")
+                    .accessibilityLabel(
+                        "Searching for nearby games. Ask a friend to open ProximiPlay and tap Start Game on their iPhone."
+                    )
 
                 case .connecting:
                     // Connecting to a selected host
@@ -54,7 +64,9 @@ struct JoinView: View {
                         ContentUnavailableView(
                             "No Games Found",
                             systemImage: "wifi.slash",
-                            description: Text("Make sure a host is nearby with ProximiPlay open.")
+                            description: Text(
+                                "Ask a friend to open ProximiPlay on their iPhone and tap Start Game to host one. Make sure both devices have Wi-Fi or Bluetooth turned on."
+                            )
                         )
                         .listRowBackground(Color.clear)
                     } else {
@@ -99,8 +111,12 @@ private struct DiscoveredHostRow: View {
     var body: some View {
         Button(action: onJoin) {
             HStack(spacing: 14) {
+                // Fixed point size, not `.title2`: the same accessibility-size
+                // clipping fix as `LobbyView`'s `GameModeCard` — a decorative
+                // glyph pinned to a fixed 44x44 badge needs a size that
+                // doesn't grow with Dynamic Type.
                 Image(systemName: "person.wave.2.fill")
-                    .font(.title2)
+                    .font(.system(size: 20, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Color.indigo)
                     .frame(width: 44, height: 44)

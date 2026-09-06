@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import MultipeerConnectivity
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -83,6 +84,21 @@ struct ResultsView: View {
 
     private var topScore: Int { rankedScores.first?.score ?? 0 }
 
+    /// Same trigger as `LobbyView`/`GameHostView`'s banner: `ConnectionMonitor`
+    /// keeps running through Results (nothing stops it until the session
+    /// itself tears down), so a peer's heartbeat going quiet while everyone's
+    /// looking at final scores — right before a host might tap "Play Again"
+    /// — is just as worth surfacing here.
+    private var reconnectingBanner: StatusBanner? {
+        guard appState.connectionMonitor.isMonitoring,
+              appState.connectionMonitor.peerHealth.values.contains(.lost) else { return nil }
+        return StatusBanner(
+            tone: .warning,
+            systemImage: "wifi.exclamationmark",
+            message: "Connection lost — reconnecting…"
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -99,6 +115,7 @@ struct ResultsView: View {
         }
         .navigationTitle("Results")
         .navigationBarTitleDisplayMode(.inline)
+        .statusBannerOverlay(reconnectingBanner)
         .hostLeftAlert()
         .onAppear {
             persistIfNeeded()
@@ -333,7 +350,10 @@ struct ResultsView: View {
             .overlay {
                 Text(String(name.prefix(1)).uppercased())
                     .font(.title2.bold())
-                    .foregroundStyle(.white)
+                    // The fill is a 30%-opacity neutral, so white sits at
+                    // roughly 1.2:1 against it. `.primary` adapts with the
+                    // colour scheme and clears AA in both.
+                    .foregroundStyle(Color.primary)
             }
             .accessibilityHidden(true)
     }
@@ -362,9 +382,15 @@ struct ResultsView: View {
             VStack(spacing: 8) {
                 ProgressView()
                     .accessibilityHidden(true)
-                Text("Waiting for the host…")
+                // Names both what's being waited on and who can end the
+                // wait, in the on-screen text itself — not just the
+                // accessibility label below — so a sighted joiner gets the
+                // same "am I stuck, or is this on the host" answer a
+                // VoiceOver user gets.
+                Text("Waiting for the host to start the next game…")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondary)
+                    .multilineTextAlignment(.center)
             }
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
@@ -715,6 +741,24 @@ private let previewVoteScores = previewPlayers.map {
             players: previewPlayers
         )
     )
+    .environment(Router())
+    .modelContainer(for: [GameHistory.self, PlayerStats.self], inMemory: true)
+}
+
+#Preview("Reconnecting Banner") {
+    NavigationStack {
+        ResultsView()
+    }
+    .environment({
+        let appState = resultsPreviewAppState(
+            mode: .quickTrivia,
+            isHost: true,
+            scores: previewTriviaScores,
+            players: previewPlayers
+        )
+        appState.connectionMonitor.peerHealth[MCPeerID(displayName: previewJoiner1.displayName)] = .lost
+        return appState
+    }())
     .environment(Router())
     .modelContainer(for: [GameHistory.self, PlayerStats.self], inMemory: true)
 }

@@ -160,6 +160,7 @@ struct DrawGameView: View {
         } else {
             VStack(spacing: 16) {
                 RoundHeaderView(roundNumber: round.index, totalRounds: totalRounds)
+                guesserBanner(drawerName: drawerName(for: round.payload.drawerId))
                 DrawingCanvasView(
                     isEditable: false,
                     segments: appState.strokeSync.segments
@@ -193,6 +194,42 @@ struct DrawGameView: View {
         .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Draw \(word). Don't show anyone your screen.")
+    }
+
+    /// Guessers previously had no on-screen indication of who was drawing
+    /// until the round's reveal — sighted players could at least glance at
+    /// the drawer's device/posture in the room, but a VoiceOver user had
+    /// nothing at all. Sourced from the roster (never from `RoundData`
+    /// itself, which only ever carries a bare `drawerId`) so this stays
+    /// correct even if the drawer disconnects and the roster changes
+    /// mid-round.
+    private func guesserBanner(drawerName: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "paintbrush.pointed.fill")
+                .foregroundStyle(Color.indigo)
+                .accessibilityHidden(true)
+            // No `.lineLimit` — a long display name at accessibility text
+            // sizes should wrap onto a second line rather than truncate or
+            // push the banner's height into overlap with the canvas below.
+            Text("\(drawerName) is drawing")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.primary)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(drawerName) is drawing")
+    }
+
+    /// Looks up the drawer's display name from the synced roster. Falls
+    /// back to a neutral label rather than crashing or showing an empty
+    /// string if the drawer has disconnected and been removed from the
+    /// roster mid-round (see `PlayerRoster.hostPlayerLeft(peer:)`).
+    private func drawerName(for drawerId: UUID) -> String {
+        appState.gameSessionManager.roster.players.first { $0.id == drawerId }?.displayName ?? "Someone"
     }
 
     // MARK: - Input Routing
@@ -424,7 +461,9 @@ private func drawPreviewAppState(roundCount: Int = 3, asDrawer: Bool = true) -> 
 
     appState.gameSessionManager.isHost = true
     appState.gameSessionManager.myPlayer = asDrawer ? host : joiner1
-    appState.gameSessionManager.roster.setHost(host)
+    // Full roster, not just the host — `guesserBanner` sources the
+    // drawer's name from here, mirroring the real `.lobbyUpdate` sync.
+    appState.gameSessionManager.roster.applyLobbyUpdate([host, joiner1, joiner2])
 
     appState.gameEngine.startGame(
         mode: .speedDraw,
@@ -473,6 +512,38 @@ private func drawPreviewAppState(roundCount: Int = 3, asDrawer: Bool = true) -> 
         DrawGameView()
     }
     .environment(drawPreviewAppState(asDrawer: false))
+    .environment(Router())
+    .dynamicTypeSize(.accessibility3)
+}
+
+/// Exercises `guesserBanner` with a long drawer name at accessibility3 —
+/// the case that would clip or overlap the canvas if the name didn't wrap.
+@MainActor
+private func longDrawerNamePreviewAppState() -> AppState {
+    let appState = AppState()
+    let host = Player(displayName: "Ari", color: .blue, isHost: true)
+    let longNameDrawer = Player(displayName: "Priyanka Chandrasekaran", color: .purple)
+    let me = Player(displayName: "Bo", color: .green)
+
+    appState.gameSessionManager.isHost = false
+    appState.gameSessionManager.myPlayer = me
+    appState.gameSessionManager.roster.applyLobbyUpdate([host, longNameDrawer, me])
+
+    // `longNameDrawer` first so `nextDrawerId()` picks them for round 1.
+    appState.gameEngine.startGame(
+        mode: .speedDraw,
+        roster: [longNameDrawer, host, me],
+        config: GameConfig(roundCount: 3, timePerRound: 60)
+    )
+
+    return appState
+}
+
+#Preview("Guesser — long drawer name, accessibility3") {
+    NavigationStack {
+        DrawGameView()
+    }
+    .environment(longDrawerNamePreviewAppState())
     .environment(Router())
     .dynamicTypeSize(.accessibility3)
 }

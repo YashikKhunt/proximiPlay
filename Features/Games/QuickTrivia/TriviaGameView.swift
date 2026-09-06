@@ -26,6 +26,13 @@ struct TriviaGameView: View {
     @State private var flow = RoundFlow<RoundSnapshot>()
     @State private var currentRoundStartedAt: Date = .distantPast
 
+    /// Countdown thresholds (in whole seconds remaining) already announced
+    /// via `AccessibilityNotification.Announcement` for the round in
+    /// progress. Reset on every round start so each round gets its own
+    /// warnings rather than silently skipping them because a previous
+    /// round already "used up" that threshold.
+    @State private var announcedThresholds: Set<Int> = []
+
     private var engine: GameEngine { appState.gameEngine }
 
     /// Host-authoritative on every device: the host sets this in
@@ -90,6 +97,7 @@ struct TriviaGameView: View {
             },
             onRoundStart: { _ in
                 currentRoundStartedAt = Date()
+                announcedThresholds = []
             }
         )
     }
@@ -125,21 +133,48 @@ struct TriviaGameView: View {
         return VStack(spacing: 20) {
             RoundHeaderView(roundNumber: round.index, totalRounds: totalRounds)
 
+            // The question card and the countdown bar share one
+            // `TimelineView` tick so the question's accessibility value
+            // (remaining time) and the bar's visual fraction are always
+            // computed from the exact same `elapsed` reading.
+            //
+            // A purely visual countdown bar leaves a VoiceOver user with no
+            // way to gauge time pressure at all, so this is exposed two
+            // ways: an `accessibilityValue` on the question that VoiceOver
+            // re-polls periodically (`.updatesFrequently`, the same trait
+            // system timers use — no per-second chatter, just an
+            // on-demand-or-occasional re-read), plus an
+            // `AccessibilityNotification.Announcement` at a couple of
+            // meaningful thresholds (half time, and a final warning) so a
+            // VoiceOver user gets a heads-up even without re-focusing the
+            // question. Deliberately *not* announced every second — that
+            // would bury the question itself under a running countdown.
             TimelineView(.periodic(from: currentRoundStartedAt, by: 1.0 / 20.0)) { context in
                 let elapsed = context.date.timeIntervalSince(currentRoundStartedAt)
+                let remaining = max(0, roundDuration - elapsed)
                 let fraction = roundDuration > 0 ? max(0, min(1, 1 - (elapsed / roundDuration))) : 0
-                ProgressView(value: fraction)
-                    .tint(fraction < 0.25 ? Color.red : Color.indigo)
-                    .accessibilityHidden(true)
-            }
+                let secondsRemaining = Int(remaining.rounded(.up))
 
-            Text(snapshot.question)
-                .font(.title3.bold())
-                .foregroundStyle(Color.primary)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(snapshot.question)
+                        .font(.title3.bold())
+                        .foregroundStyle(Color.primary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    ProgressView(value: fraction)
+                        .tint(fraction < 0.25 ? Color.red : Color.indigo)
+                        .accessibilityHidden(true)
+                }
                 .padding(16)
                 .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityElement(children: .combine)
+                .accessibilityValue(timeRemainingDescription(secondsRemaining))
+                .accessibilityAddTraits(.updatesFrequently)
+                .onChange(of: secondsRemaining) { _, newValue in
+                    announceThresholdIfCrossed(secondsRemaining: newValue)
+                }
+            }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(Array(snapshot.options.enumerated()), id: \.offset) { index, option in
@@ -183,6 +218,40 @@ struct TriviaGameView: View {
 
         flow.updateCurrent { $0.mySelectedIndex = index }
         appState.submitPlayerInput(.triviaAnswer(index: index, timestamp: Date()))
+    }
+
+    // MARK: - Countdown Accessibility
+
+    /// The `accessibilityValue` VoiceOver re-polls (via `.updatesFrequently`)
+    /// on the question card — the non-visual stand-in for the countdown bar.
+    private func timeRemainingDescription(_ secondsRemaining: Int) -> String {
+        if secondsRemaining <= 0 { return "Time's up" }
+        if secondsRemaining == 1 { return "1 second remaining" }
+        return "\(secondsRemaining) seconds remaining"
+    }
+
+    /// Half the round and a final 5-second warning — enough notice to
+    /// answer without turning the countdown into a running commentary.
+    /// Skips a threshold shorter than the round itself has no room for
+    /// (e.g. a hypothetical sub-5-second round never posts the "5 seconds
+    /// left" warning).
+    private var countdownAnnouncementThresholds: [Int] {
+        guard roundDuration > 1 else { return [] }
+        let half = Int((roundDuration / 2).rounded())
+        let thresholds = Set([half, 5]).filter { $0 > 0 && $0 < Int(roundDuration) }
+        return thresholds.sorted(by: >)
+    }
+
+    /// Posts one `AccessibilityNotification.Announcement` the first time
+    /// `secondsRemaining` reaches (or drops past) each threshold, then
+    /// marks it done so it never repeats for this round — see
+    /// `announcedThresholds`.
+    private func announceThresholdIfCrossed(secondsRemaining: Int) {
+        for threshold in countdownAnnouncementThresholds
+        where secondsRemaining <= threshold && !announcedThresholds.contains(threshold) {
+            announcedThresholds.insert(threshold)
+            AccessibilityNotification.Announcement("\(threshold) seconds left").post()
+        }
     }
 
     // MARK: - Types
@@ -230,13 +299,21 @@ private struct TriviaAnswerButton: View {
     let state: AnswerState
     let action: () -> Void
 
+    /// Ties the letter badge's diameter to the same text style as its
+    /// glyph (`.headline`) so the badge grows in step with Dynamic Type.
+    /// A fixed 28×28 frame with a `Circle()` *background* clips at
+    /// accessibility sizes — backgrounds don't clip to their view's frame,
+    /// so the scaled-up letter simply overflows the circle and collides
+    /// with the adjacent answer text instead of being cut off cleanly.
+    @ScaledMetric(relativeTo: .headline) private var badgeSize: CGFloat = 28
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Text(letter)
                     .font(.headline)
                     .foregroundStyle(state == .selected ? Color.white : Color.primary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: badgeSize, height: badgeSize)
                     .background(
                         state == .selected ? Color.indigo : Color(uiColor: .tertiarySystemBackground),
                         in: Circle()

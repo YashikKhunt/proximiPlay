@@ -68,6 +68,7 @@
 		E07DD4CBCBD14E998C042A04 /* round_start.wav in Resources */ = {isa = PBXBuildFile; fileRef = 387CB24D191943D8A195B629 /* round_start.wav */; };
 		EB873960843E46F4AE16DFAA /* ReflexGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183F02246B3748469E7AC70C /* ReflexGameView.swift */; };
 		EDE28E6D06224E1E998A568B /* TriviaGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E514E52689042D9980EB75F /* TriviaGameView.swift */; };
+		F69347EF8F54752C1485620D /* StatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF8A9203FB8741394B922DC /* StatusBanner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -119,6 +120,7 @@
 		474351F53049768C001644A3 /* ConnectionIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionIndicator.swift; sourceTree = "<group>"; };
 		474351F63049768C001644A3 /* PlayerBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBadge.swift; sourceTree = "<group>"; };
 		474351F73049768C001644A3 /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimaryButton.swift; sourceTree = "<group>"; };
+		5FF8A9203FB8741394B922DC /* StatusBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBanner.swift; sourceTree = "<group>"; };
 		6ABAC638B58EA1F895F16A8A /* GameHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHostView.swift; sourceTree = "<group>"; };
 		78424D1E60884C559F8F8B49 /* TriviaRoundResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriviaRoundResultView.swift; sourceTree = "<group>"; };
 		7E84EC1F16A749F1913A2891 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -417,6 +419,7 @@
 				474351F53049768C001644A3 /* ConnectionIndicator.swift */,
 				474351F63049768C001644A3 /* PlayerBadge.swift */,
 				474351F73049768C001644A3 /* PrimaryButton.swift */,
+				5FF8A9203FB8741394B922DC /* StatusBanner.swift */,
 				0D0DEA13C7975C7E98D0E63C /* RoundHeaderView.swift */,
 				185BD9F05975EE07B96CA870 /* LeaveGameGuard.swift */,
 			);
@@ -645,6 +648,7 @@
 				474351FB3049768C001644A3 /* ConnectionIndicator.swift in Sources */,
 				474351FC3049768C001644A3 /* PlayerBadge.swift in Sources */,
 				474351FD3049768C001644A3 /* PrimaryButton.swift in Sources */,
+				F69347EF8F54752C1485620D /* StatusBanner.swift in Sources */,
 				474351DE30497603001644A3 /* Router.swift in Sources */,
 				474351D7304974F3001644A3 /* PlayerStats.swift in Sources */,
 				474351D8304974F3001644A3 /* GameHistory.swift in Sources */,
