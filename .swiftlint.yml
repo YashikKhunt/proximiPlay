@@ -1,0 +1,61 @@
+# SwiftLint configuration for ProximiPlay
+#
+# Created by the Phase 3 release review. Every rule below corresponds to a
+# defect that actually shipped in this project and had to be found by hand —
+# the point is that the next instance is caught on build instead.
+#
+# All three were verified silent against the tree at the time of writing, so
+# a hit is a genuine regression, not pre-existing noise.
+#
+# SwiftLint is not currently installed on this machine. To run it:
+#   brew install swiftlint
+# and optionally add a Run Script build phase (see the snippet at the bottom).
+
+included:
+  - App
+  - Features
+  - Models
+  - Networking
+  - Shared
+
+excluded:
+  - proximiPlayTests
+  - proximiPlayUITests
+  - Resources
+
+custom_rules:
+  inline_haptic_generator:
+    name: "Inline haptic generator"
+    # Four of these were found bypassing the Settings mute toggle entirely —
+    # including the winner reveal, the most prominent haptic in the app. The
+    # user could turn haptics off and still feel them.
+    regex: 'UI(Impact|Notification|Selection)FeedbackGenerator'
+    excluded: ".*/Shared/Feedback/.*"
+    message: "Route haptics through HapticEngine.shared so the Settings mute toggle applies."
+    severity: warning
+
+  animation_bypasses_motion:
+    name: "Animation bypasses Motion helper"
+    # Visual QA found seven of these ignoring Reduce Motion — in the same
+    # phase the Motion helper was introduced to prevent exactly that. Four
+    # predated the helper; the ergonomic path only helps where it's reached for.
+    regex: '\.animation\('
+    excluded: ".*/Shared/Extensions/Motion\.swift"
+    message: "Use .motion(_:value:) instead so Reduce Motion is respected."
+    severity: warning
+
+  no_print_in_production:
+    name: "print() in production code"
+    # None today — os.Logger is used consistently. This keeps it that way.
+    regex: '\bprint\('
+    message: "Use os.Logger instead of print()."
+    severity: warning
+
+# Optional Run Script build phase (soft-fails when swiftlint isn't installed,
+# so the build never breaks for someone who hasn't brew-installed it):
+#
+#   if which swiftlint > /dev/null; then
+#     swiftlint --config "$SRCROOT/.swiftlint.yml"
+#   else
+#     echo "warning: SwiftLint not installed — skipping lint"
+#   fi

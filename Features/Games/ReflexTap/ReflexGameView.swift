@@ -20,15 +20,16 @@ import SwiftUI
 /// ## Detecting a new round with no per-round payload
 ///
 /// Unlike trivia's question or vote's prompt, `RoundData.reflex` carries no
-/// associated data at all -- there's nothing to diff between round 1 and
-/// round 3 to notice they're different rounds. This view instead watches the
-/// **edge** of `currentRound` going from `nil` to non-`nil`
-/// (``isRoundActive``), which still fires correctly on every round because
-/// `GameEngine` always resets `currentRound` back to `nil` when a round's
-/// result is broadcast (`finishRound()` on the host,
-/// `applyFollowerMessage(.roundResult)` on joiners) before the next
-/// `.roundStart` sets it again -- so every round genuinely passes through a
-/// `nil` in between, making the `Bool` transition a reliable signal.
+/// associated data at all -- there's nothing in the round content to tell
+/// round 1 from round 3. This view therefore triggers on
+/// ``activeRoundNumber`` (an `Int?`), whose *value* differs per round.
+///
+/// An earlier version watched a `Bool` "is a round active" edge instead, on
+/// the reasoning that `currentRound` always passes through `nil` between
+/// rounds. It does — but `finishRound()` calls `runRound()` synchronously in
+/// the same turn, so Observation coalesces non-nil -> nil -> non-nil into one
+/// update and the `Bool` reads `true` on both sides. Rounds 2+ were never
+/// queued and the mode stalled on the waiting view. See ``activeRoundNumber``.
 ///
 /// ## Deriving the flash moment with no delay on the wire
 ///
@@ -76,10 +77,25 @@ struct ReflexGameView: View {
     /// (`GameEngine.applyFollowerMessage`). No local `GameConfig` guess.
     private var totalRounds: Int { engine.totalRounds }
 
-    /// See "Detecting a new round with no per-round payload" above.
-    private var isRoundActive: Bool {
-        if case .reflex? = engine.currentRound { return true }
-        return false
+    /// The active round's number, or `nil` between rounds.
+    ///
+    /// **This must not be a `Bool`.** `RoundData.reflex` carries no payload,
+    /// so unlike the other three modes there is nothing in the round content
+    /// to tell round N from round N+1. A `Bool` "is a round active" trigger
+    /// looks like it works and does not: `GameEngine.finishRound()` sets
+    /// `currentRound = nil` and then calls `runRound()` **synchronously, in
+    /// the same turn**, which sets it non-`nil` again. Observation coalesces
+    /// that into a single update, so a `Bool` reads `true` both before and
+    /// after and `.onChange` never fires — every round after the first was
+    /// silently never queued, leaving the player on the waiting view for the
+    /// rest of the game.
+    ///
+    /// Carrying the round number makes the value itself differ per round
+    /// (1 → 2 → 3), so the change survives coalescing exactly the way the
+    /// other modes' content-bearing payloads do.
+    private var activeRoundNumber: Int? {
+        if case .reflex? = engine.currentRound { return engine.roundNumber }
+        return nil
     }
 
     var body: some View {
@@ -123,9 +139,9 @@ struct ReflexGameView: View {
         .roundFlow(
             flow,
             engine: engine,
-            roundTrigger: isRoundActive,
-            beginRound: { isActive, nextRoundIndex in
-                guard isActive else { return nil }
+            roundTrigger: activeRoundNumber,
+            beginRound: { activeRound, nextRoundIndex in
+                guard activeRound != nil else { return nil }
                 return RoundSnapshot(flashDelay: Self.flashDelay(forRound: nextRoundIndex))
             },
             onReveal: { reveal in

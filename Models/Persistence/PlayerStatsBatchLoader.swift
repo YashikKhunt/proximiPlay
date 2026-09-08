@@ -24,29 +24,7 @@ import SwiftData
 /// directly unit-testable against an in-memory container without a live
 /// game/UI stack — see `PlayerStatsBatchLoaderTests`.
 ///
-/// ## Outstanding call-site swap
-///
-/// `ResultsView.swift` is out of this task's file ownership (owned by a
-/// concurrently-running agent building the share-result-card feature), so
-/// this helper is added but **not yet wired in**. The swap `ResultsView`
-/// needs, once safe to make:
-///
-/// ```swift
-/// // Once, before the per-player loop in persistIfNeeded():
-/// let existing = (try? PlayerStatsBatchLoader.existingStats(
-///     for: finalScores.map(\.displayName),
-///     in: modelContext
-/// )) ?? [:]
-///
-/// // Inside upsertPlayerStats(for:isWinner:mode:), replacing its own
-/// // per-call FetchDescriptor with a lookup into `existing`:
-/// if let stats = existing[score.displayName] {
-///     stats.gamesPlayed += 1
-///     ...
-/// } else {
-///     modelContext.insert(PlayerStats(displayName: score.displayName, ...))
-/// }
-/// ```
+
 enum PlayerStatsBatchLoader {
 
     /// Fetches every existing `PlayerStats` row whose `displayName` appears

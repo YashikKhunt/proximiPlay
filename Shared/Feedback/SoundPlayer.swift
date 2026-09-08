@@ -66,7 +66,7 @@ final class SoundPlayer: NSObject {
         case playerJoined = "player_joined"
     }
 
-    private nonisolated static let logger = Logger(subsystem: "com.yashik.proximiPlay", category: "SoundPlayer")
+    private nonisolated static let logger = Logger(subsystem: "com.proximiplay", category: "SoundPlayer")
 
     private var cachedBuffers: [Event: Data] = [:]
     private var activePlayers: Set<AVAudioPlayer> = []
@@ -108,6 +108,20 @@ final class SoundPlayer: NSObject {
     }
 
     // MARK: - Buffer Cache
+
+    /// Reads every effect into the cache ahead of time.
+    ///
+    /// Without this, the first play of each effect does a synchronous
+    /// `Data(contentsOf:)` on the main actor. `.roundStart`'s first play is
+    /// scheduled at the exact instant Reflex Tap's flash appears — the single
+    /// most latency-critical moment in the app, which is why `HapticEngine`
+    /// is already primed two lines earlier there. This gives sound the same
+    /// treatment. Cheap (seven short WAVs) and idempotent.
+    func preloadAll() {
+        for event in Event.allCases where cachedBuffers[event] == nil {
+            _ = buffer(for: event)
+        }
+    }
 
     private func buffer(for event: Event) -> Data? {
         if let cached = cachedBuffers[event] { return cached }

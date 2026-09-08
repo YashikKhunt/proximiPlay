@@ -52,6 +52,12 @@ struct NicknameEditorView: View {
         PlayerNickname.sanitize(draft)
     }
 
+    /// What the preview row shows: the resolved name, or a neutral
+    /// placeholder while the field is empty (never the device name).
+    private var previewName: String {
+        isEmptyDraft ? "Your name" : resolvedName
+    }
+
     private var isEmptyDraft: Bool { trimmed.isEmpty }
 
     var body: some View {
@@ -80,13 +86,21 @@ struct NicknameEditorView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
                     if isEmptyDraft {
+                        // Deliberately does NOT offer the device name as a
+                        // fallback, and does not print it here. This screen
+                        // exists precisely because broadcasting
+                        // `UIDevice.current.name` ("Yashik's iPhone") to
+                        // strangers in Bluetooth range is a privacy leak —
+                        // inviting the user to leave the field blank, and
+                        // showing them the device name to advertise it, put
+                        // that leak back.
                         Label(
-                            "Leave this empty and we'll use \"\(PlayerNickname.deviceName)\".",
+                            "Enter a name so other players can tell who you are.",
                             systemImage: "info.circle"
                         )
                         .font(.footnote)
                     } else {
-                        Text("This is the name nearby players see. Your device name is never shared.")
+                        Text("This is the name nearby players see in the lobby and on shared results.")
                     }
 
                     Text("\(trimmed.count) of \(PlayerNickname.maxLength) characters")
@@ -115,6 +129,10 @@ struct NicknameEditorView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { save() }
                     .fontWeight(.semibold)
+                    // Disabled while empty rather than silently falling back
+                    // to the device name — that fallback is the exact leak
+                    // this screen exists to close.
+                    .disabled(isEmptyDraft)
                     .accessibilityHint("Saves your name and returns to the home screen")
             }
         }
@@ -126,16 +144,19 @@ struct NicknameEditorView: View {
 
     // MARK: - Preview Row
 
-    /// Shows exactly what other devices will render for this player —
-    /// including the device-name fallback when the field is cleared, so the
-    /// "graceful fallback" is visible rather than a surprise.
+    /// Shows exactly what other devices will render for this player.
+    ///
+    /// While the field is empty this shows a neutral placeholder rather than
+    /// the device-name fallback: surfacing "Yashik's iPhone" here would both
+    /// advertise the leak this screen closes and imply it is an acceptable
+    /// choice. Done is disabled in that state anyway.
     private var previewRow: some View {
         HStack(spacing: 12) {
             Circle()
                 .fill(appState.gameSessionManager.myPlayer.color.swiftUIColor)
                 .frame(width: 40, height: 40)
                 .overlay {
-                    Text(resolvedName.prefix(1).uppercased())
+                    Text(previewName.prefix(1).uppercased())
                         .font(.headline.bold())
                         // Matches PlayerBadge: white fails AA on half the
                         // palette, so the foreground is derived, not assumed.
@@ -149,8 +170,9 @@ struct NicknameEditorView: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(resolvedName)
+                Text(previewName)
                     .font(.headline)
+                    .foregroundStyle(isEmptyDraft ? Color.secondary : Color.primary)
                     .foregroundStyle(Color.primary)
                 Text("How others see you")
                     .font(.caption)
@@ -161,7 +183,7 @@ struct NicknameEditorView: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Others will see you as \(resolvedName)")
+        .accessibilityLabel(isEmptyDraft ? "Enter a name to see how others will see you" : "Others will see you as \(resolvedName)")
     }
 
     // MARK: - Actions

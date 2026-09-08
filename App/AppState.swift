@@ -110,7 +110,7 @@ private final class StrokeRelay: Sendable {
     private let continuation: AsyncStream<Job>.Continuation
     private let consumerTask: Task<Void, Never>
 
-    /// Deepest relay backlog held before the oldest jobs are dropped.
+    /// Deepest relay backlog held before the *stalest* jobs are dropped.
     ///
     /// `AsyncStream`'s default policy is `.unbounded`, which would let the
     /// queue grow without limit if `MCSession.send` ever ran slower than
@@ -120,11 +120,17 @@ private final class StrokeRelay: Sendable {
     /// data is still worth delivering. Dropping beats growing here: the
     /// transport is `.unreliable` by design and the receiver's own segment
     /// buffer is capped too, so a gap is already an expected outcome.
+    ///
+    /// `.bufferingNewest`, deliberately: `.bufferingOldest(n)` keeps the
+    /// oldest n and discards *arriving* ones once full, which is backwards
+    /// here — under congestion the relay would drain an ever-staler queue
+    /// while throwing away the strokes being drawn right now, so guessers
+    /// would fall further behind instead of catching up to live.
     private static let maxBacklog = 512
 
     init(sender: GameSessionManager) {
         let (stream, continuation) = AsyncStream<Job>.makeStream(
-            bufferingPolicy: .bufferingOldest(Self.maxBacklog)
+            bufferingPolicy: .bufferingNewest(Self.maxBacklog)
         )
         self.continuation = continuation
         // .utility, matching ConnectionMonitor's heartbeat loop: real-time
@@ -268,6 +274,13 @@ final class AppState {
         // Peer loss arrives as an MCSession state change, never as a
         // `.disconnect` message — nothing in the app sends one — so this is
         // the only path that tells game state somebody left mid-round.
+        // Warm the sound cache off the critical path: the first play of
+        // each effect otherwise does synchronous disk I/O, and `.roundStart`'s
+        // first play lands exactly on Reflex Tap's flash.
+        Task { @MainActor in
+            SoundPlayer.shared.preloadAll()
+        }
+
         gameSessionManager.onPlayerLeft = { playerId in
             strokeThrottle.reset(playerId)
             engine.playerDisconnected(playerId)

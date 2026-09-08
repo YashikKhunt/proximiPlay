@@ -475,8 +475,13 @@ final class GameSessionManager: NSObject, Sendable {
     @MainActor
     func isMessageAuthentic(_ message: GameMessage, from peer: MCPeerID) -> Bool {
         switch message {
-        case .playerInput(let playerId, _, _):
-            if isFromHost(peer) { return true }
+        case .playerInput(let playerId, let input, _):
+            // The host relays exactly one input kind — `.drawStroke`, for the
+            // star topology's benefit — having already validated the original
+            // sender. Scope the bypass to that case rather than to "anything
+            // from the host", so a future relay path can't silently inherit
+            // unauthenticated-playerId trust.
+            if isFromHost(peer), case .drawStroke = input { return true }
             return roster.isValid(playerId: playerId, from: peer)
         case .disconnect(let playerId):
             return roster.isValid(playerId: playerId, from: peer)

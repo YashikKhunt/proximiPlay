@@ -26,7 +26,7 @@ nonisolated enum ContentPackError: Error, Sendable, Equatable {
 /// fast while still failing loudly (via a thrown `ContentPackError`) if a
 /// pack is missing or malformed.
 nonisolated enum ContentPackLoader {
-    private static let logger = Logger(subsystem: "com.yashik.proximiPlay", category: "ContentPackLoader")
+    private static let logger = Logger(subsystem: "com.proximiplay", category: "ContentPackLoader")
 
     // MARK: - Trivia
 

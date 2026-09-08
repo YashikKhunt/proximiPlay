@@ -104,7 +104,11 @@ private struct StatusBannerOverlay: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .overlay(alignment: .top) {
+            // safeAreaInset, not overlay: the reconnecting banner persists
+            // for as long as a peer stays unreachable, and an overlay would
+            // sit on top of the lobby's own roster header / the results
+            // trophy for that whole time.
+            .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 8) {
                     ForEach(banners, id: \.self) { banner in
                         banner

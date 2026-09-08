@@ -93,12 +93,16 @@ struct DrawingCanvasView: View {
                         )
                     }
                 }
-                // Metal-backed compositing: with up to `StrokeSync
-                // .maxSegments` (500) polylines redrawn on a guesser's
-                // screen late in a round, letting Core Animation cache this
-                // subtree as a single rasterized layer keeps that cost off
-                // the CPU on every frame.
-                .drawingGroup()
+                // Metal-backed compositing, guesser-side only: with up to
+                // `StrokeSync.maxSegments` (500) polylines redrawn late in a
+                // round, caching this subtree as one rasterized layer keeps
+                // that cost off the CPU. Deliberately NOT applied to the
+                // drawer's own canvas — there the in-progress stroke changes
+                // every touch-move (~60-120Hz) with only a handful of strokes
+                // on screen, so there is no static content to amortize and
+                // the forced render-to-texture pass is pure overhead on the
+                // most latency-sensitive interaction in the game.
+                .modifier(RasterizeWhenStatic(enabled: !isEditable))
                 .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
                 .overlay {
                     RoundedRectangle(cornerRadius: 20)
@@ -391,3 +395,28 @@ private extension DrawingCanvasView {
         .dynamicTypeSize(.accessibility3)
 }
 #endif
+
+
+// MARK: - Conditional Rasterization
+
+/// Applies `.drawingGroup()` only when the canvas content is effectively
+/// static between frames.
+///
+/// `.drawingGroup()` rasterizes a subtree into one Metal-backed layer, which
+/// is a clear win for the guesser's canvas — up to `StrokeSync.maxSegments`
+/// (500) polylines that only change when a batch arrives. It is a loss on the
+/// drawer's own canvas: the in-progress stroke changes on every touch-move
+/// (~60-120Hz) with only a handful of strokes present, so there is no static
+/// content to amortize and the forced render-to-texture-and-composite step is
+/// pure overhead on the most latency-sensitive interaction in the game.
+private struct RasterizeWhenStatic: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.drawingGroup()
+        } else {
+            content
+        }
+    }
+}

@@ -131,7 +131,14 @@ struct ResultsView: View {
         .onAppear {
             persistIfNeeded()
             triggerCelebration()
-            renderShareCard()
+            // Deferred a turn: `ImageRenderer` rasterizes 1080x1620 px
+            // synchronously on the main thread, and running it in the same
+            // event as `triggerCelebration()` ate the first frames of the
+            // winner-reveal spring. The toolbar shows a spinner until it
+            // lands, so nothing is tappable-but-dead in the meantime.
+            Task { @MainActor in
+                renderShareCard()
+            }
         }
         .onChange(of: sessionManager.lastGameStartToken) { _, _ in
             handleGameStartRebroadcast()

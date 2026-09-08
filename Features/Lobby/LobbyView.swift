@@ -288,7 +288,7 @@ struct LobbyView: View {
                 HStack(spacing: 12) {
                     ProgressView()
                         .accessibilityHidden(true)
-                    Text("Host is choosing a game…")
+                    Text("Waiting for the host to choose a game…")
                         .foregroundStyle(Color.secondary)
                 }
                 .accessibilityElement(children: .combine)

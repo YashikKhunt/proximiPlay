@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- ProximiPlay collects nothing and tracks nobody. All state is local:
+	     SwiftData game history on-device, plus three UserDefaults values
+	     (the archived MCPeerID, the player nickname, and the sound/haptics
+	     toggles). There is no backend, no accounts, and no networking beyond
+	     peer-to-peer MultipeerConnectivity between co-present devices. -->
+
+	<key>NSPrivacyTracking</key>
+	<false/>
+
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- UserDefaults is a Required Reason API. Used only for this
+			     app's own settings and identity, never shared with or
+			     derived from other apps:
+			       Networking/GameSessionManager.swift — archived MCPeerID
+			         (Multipeer refuses to reconnect if the peer identity is
+			         rebuilt, so it must survive relaunch)
+			       Models/Player.swift — the player's chosen nickname
+			       Shared/Feedback/FeedbackSettings.swift — sound/haptics
+			         toggles
+			     CA92.1 = "accessing information from the app itself". -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
