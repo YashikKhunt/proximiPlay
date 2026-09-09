@@ -176,7 +176,6 @@ final class AppState {
     /// `StrokeSync`'s doc comment for the full wire convention.
     let strokeSync = StrokeSync()
     var currentGameState: GameState = .idle
-    var isPremiumUnlocked: Bool = false
 
     init() {
         let engine = GameEngine(sender: gameSessionManager)

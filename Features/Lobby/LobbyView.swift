@@ -402,12 +402,6 @@ private struct GameModeCard: View {
                     .foregroundStyle(Color.primary)
                     .lineLimit(1)
 
-                if mode.isPremium {
-                    Image(systemName: "lock.fill")
-                        .font(.caption2)
-                        .foregroundStyle(Color.secondary)
-                        .accessibilityHidden(true)
-                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -429,9 +423,7 @@ private struct GameModeCard: View {
     }
 
     private var accessibilityDescription: String {
-        var parts = [mode.displayName, mode.description]
-        if mode.isPremium { parts.append("Premium") }
-        return parts.joined(separator: ", ")
+        [mode.displayName, mode.description].joined(separator: ", ")
     }
 }
 

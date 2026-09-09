@@ -44,12 +44,4 @@ enum GameMode: String, Codable, CaseIterable, Identifiable, Sendable {
             "Tap the screen the instant the signal appears -- fastest finger wins."
         }
     }
-
-    /// Premium modes require an in-app purchase to unlock.
-    var isPremium: Bool {
-        switch self {
-        case .quickTrivia, .voteBattle: false
-        case .speedDraw, .reflexTap:    true
-        }
-    }
 }
