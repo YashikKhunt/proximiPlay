@@ -287,6 +287,49 @@ final class AppState {
         }
     }
 
+    // MARK: - Debug Roster Seeding
+
+#if DEBUG
+    /// Populates the roster with fake connected peers so lobby and roster UI
+    /// can be inspected on a single device.
+    ///
+    /// Multipeer Connectivity needs at least two real devices to put anybody
+    /// but yourself in the roster, so every multi-player lobby state has
+    /// historically been unreviewable in the Simulator — which is how a
+    /// roster row shipped rendering its avatar hard-right with the name
+    /// centred underneath. Opt in with the `-demo-roster` launch argument;
+    /// it is compiled out of release builds entirely and never runs during a
+    /// real session.
+    ///
+    /// Purely presentational: it seeds `PlayerRoster` and peer health, and
+    /// starts no session, so nothing here can reach the network.
+    ///
+    /// The seeded peer health is deliberately short-lived — `ConnectionMonitor`
+    /// prunes health for any peer absent from the real `connectedPeers`, which
+    /// a fake roster never joins — so the health dots fade after a heartbeat
+    /// tick. Expected, not a bug in the row; `PlayerRow`'s previews cover the
+    /// dot's rendering.
+    func seedDemoRosterIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-demo-roster") else { return }
+
+        gameSessionManager.isHost = true
+        gameSessionManager.roster.setHost(gameSessionManager.myPlayer)
+
+        let demoPeers: [(name: String, health: ConnectionMonitor.PeerHealth)] = [
+            ("Bo", .healthy),
+            ("Cass", .degraded),
+            ("Devinder", .lost)
+        ]
+        for peer in demoPeers {
+            let peerID = MCPeerID(displayName: peer.name)
+            _ = gameSessionManager.roster.hostPlayerJoined(peer: peerID, displayName: peer.name)
+            connectionMonitor.peerHealth[peerID] = peer.health
+        }
+
+        Self.logger.info("Seeded a demo roster (-demo-roster) — no session started")
+    }
+#endif
+
     /// Explicitly tears down the active session and stops connection
     /// monitoring.
     ///

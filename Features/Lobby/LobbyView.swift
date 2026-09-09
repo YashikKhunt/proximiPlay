@@ -10,8 +10,6 @@ struct LobbyView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
     @Environment(\.motionReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     /// Host-only local selection — never synced live to joiners (see
     /// `startGame()` doc comment for why). Defaults to the first mode.
@@ -27,7 +25,7 @@ struct LobbyView: View {
 
     /// Surfaced whenever any connected peer's heartbeat has been missing for
     /// more than 5 seconds (`ConnectionMonitor.PeerHealth.lost`) — a real,
-    /// observed connectivity problem, not a guess. `PlayerBadge`'s own health
+    /// observed connectivity problem, not a guess. `PlayerRow`'s own health
     /// dot already reports this per-player; this banner is the "something is
     /// actually wrong right now" heads-up that doesn't require scanning the
     /// roster to notice. Clears itself the moment a heartbeat is heard again.
@@ -99,6 +97,13 @@ struct LobbyView: View {
         }
         .task {
             appState.connectionMonitor.startMonitoring(sessionManager: sessionManager)
+#if DEBUG
+            // No-op unless launched with `-demo-roster`. Seeded here rather
+            // than at app launch because starting to host rebuilds the
+            // roster, which would wipe an earlier seed. See
+            // `AppState.seedDemoRosterIfRequested()`.
+            appState.seedDemoRosterIfRequested()
+#endif
         }
         .onDisappear {
             // Phase 2 pushes a game screen on top of the Lobby, which also
@@ -156,48 +161,15 @@ struct LobbyView: View {
     @ViewBuilder
     private var myPlayerSection: some View {
         Section {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(sessionManager.myPlayer.color.swiftUIColor)
-                    .frame(width: 36, height: 36)
-                    .overlay {
-                        Text(sessionManager.myPlayer.displayName.prefix(1).uppercased())
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            // Same WCAG-derived choice PlayerBadge makes —
-                            // white fails AA on half the palette.
-                            .foregroundStyle(
-                                sessionManager.myPlayer.color.accessibleForeground(
-                                    for: colorScheme,
-                                    contrast: colorSchemeContrast
-                                )
-                            )
-                    }
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(sessionManager.myPlayer.displayName)
-                        .font(.headline)
-
-                    Text("You")
-                        .font(.caption)
-                        .foregroundStyle(Color.secondary)
-                }
-
-                Spacer()
-
-                if sessionManager.isHost {
-                    Label("Host", systemImage: "crown.fill")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.indigo, in: Capsule())
-                        .accessibilityLabel("Host badge")
-                }
-            }
-            .padding(.vertical, 4)
+            // No `peerHealth`: this device has no heartbeat with itself.
+            // `isHost` comes from the session manager rather than
+            // `myPlayer.isHost`, since that is the authority on whether
+            // *this* device is hosting.
+            PlayerRow(
+                player: sessionManager.myPlayer,
+                subtitle: "You",
+                isHost: sessionManager.isHost
+            )
         } header: {
             Text("You")
         }
@@ -213,9 +185,15 @@ struct LobbyView: View {
                 noOtherPlayersView
             } else {
                 ForEach(otherPlayers) { player in
-                    PlayerBadge(player: player, peerHealth: appState.peerHealth(for: player))
-                        .padding(.vertical, 4)
-                        .transition(playerRowTransition)
+                    // `PlayerRow`, not `PlayerBadge`: the badge is the
+                    // vertical avatar-over-centred-name form built for the
+                    // results and Vote Battle grids, and it read as broken
+                    // in a full-width list row next to the "You" row above.
+                    PlayerRow(
+                        player: player,
+                        peerHealth: appState.peerHealth(for: player)
+                    )
+                    .transition(playerRowTransition)
                 }
             }
         } header: {

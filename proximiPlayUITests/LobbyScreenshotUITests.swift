@@ -47,6 +47,29 @@ final class LobbyScreenshotUITests: XCTestCase {
         try capture(named: "lobby-host", into: directory)
     }
 
+    /// Captures a host lobby with a populated roster — the frame that was
+    /// previously impossible to review without two physical devices, and so
+    /// the frame in which a broken roster row went unnoticed.
+    ///
+    /// The peers come from `AppState.seedDemoRosterIfRequested()`, a
+    /// DEBUG-only seed gated behind the `-demo-roster` launch argument. No
+    /// Multipeer session is started.
+    @MainActor
+    func testCaptureHostLobbyWithPlayersFrame() throws {
+        let directory = try screenshotDirectory()
+        let app = XCUIApplication()
+        app.launchArguments += ["-demo-roster"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["Start Game"].waitForExistence(timeout: 5))
+        app.buttons["Start Game"].tap()
+        XCTAssertTrue(app.navigationBars["Game Lobby"].waitForExistence(timeout: 5))
+
+        // Let the seeded roster's arrival animation settle before capturing.
+        Thread.sleep(forTimeInterval: 1.5)
+        try capture(named: "lobby-host-with-players", into: directory)
+    }
+
     /// Captures `JoinView`'s "still searching" state — no host is actually
     /// nearby in the test environment, so `connectionState` stays `.browsing`
     /// with an empty `discoveredHosts`, which is exactly the frame this is

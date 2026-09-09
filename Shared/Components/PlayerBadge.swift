@@ -37,6 +37,32 @@ struct PlayerBadge: View {
                             .font(.title2.bold())
                             .foregroundStyle(initialForegroundColor)
                     }
+                    // Connection health dot (only rendered when a health
+                    // value is provided).
+                    //
+                    // Deliberately an `.overlay` on the avatar rather than a
+                    // third `ZStack` child: as a sibling it needed
+                    // `.frame(maxWidth: .infinity, maxHeight: .infinity,
+                    // alignment: .bottomTrailing)` to reach the corner, and
+                    // that `.infinity` sized the whole `ZStack` to every
+                    // point of width offered. In a full-width container the
+                    // badge then stretched edge to edge, and the `ZStack`'s
+                    // `.topTrailing` alignment dragged the 50pt avatar to the
+                    // trailing edge while the name below stayed centred — the
+                    // lobby roster rendered as "avatar hard right, name in the
+                    // middle". An overlay is bounded by the circle it decorates,
+                    // so the badge keeps its intrinsic size and the corner
+                    // placement both.
+                    .overlay(alignment: .bottomTrailing) {
+                        if let health = peerHealth {
+                            Circle()
+                                .fill(health.indicatorColor)
+                                .frame(width: 10, height: 10)
+                                .overlay(Circle().stroke(.background, lineWidth: 2))
+                                .offset(x: 2, y: 2)
+                                .accessibilityHidden(true)
+                        }
+                    }
 
                 // Host crown badge
                 if player.isHost {
@@ -45,17 +71,6 @@ struct PlayerBadge: View {
                         .foregroundStyle(.yellow)
                         .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
                         .offset(x: 4, y: -4)
-                        .accessibilityHidden(true)
-                }
-
-                // Connection health dot (only rendered when a health value is provided)
-                if let health = peerHealth {
-                    Circle()
-                        .fill(healthColor(health))
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(.background, lineWidth: 2))
-                        .offset(x: 2, y: 2)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .accessibilityHidden(true)
                 }
             }
@@ -82,22 +97,8 @@ struct PlayerBadge: View {
     private var accessibilityDescription: String {
         var parts = [player.displayName]
         if player.isHost { parts.append("host") }
-        if let health = peerHealth {
-            switch health {
-            case .healthy:  parts.append("connected")
-            case .degraded: parts.append("weak connection")
-            case .lost:     parts.append("connection lost")
-            }
-        }
+        if let health = peerHealth { parts.append(health.accessibilityDescription) }
         return parts.joined(separator: ", ")
-    }
-
-    private func healthColor(_ health: ConnectionMonitor.PeerHealth) -> Color {
-        switch health {
-        case .healthy:  .green
-        case .degraded: .yellow
-        case .lost:     .red
-        }
     }
 }
 
