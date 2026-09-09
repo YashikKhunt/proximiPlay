@@ -518,17 +518,31 @@ final class GameEngine {
         let scoreList = players.map {
             PlayerScore(playerId: $0.id, displayName: $0.displayName, score: scores[$0.id] ?? 0)
         }
+        // Decided *before* the result is built so it can ship inside it.
+        // Joiners cannot infer this from `.gameEnd` arriving, because that
+        // is a separate message landing a main-actor turn later than the
+        // `.roundResult` their reveal is driven by — see `RoundResult.isFinal`.
+        // This is the single source of truth for "was that the last round?":
+        // the `endGame()` branch below reads the same value rather than
+        // re-deriving the condition, so the flag and the behaviour cannot
+        // drift apart.
+        let isFinalRound: Bool = {
+            guard let config, players.count >= 2 else { return true }
+            return roundNumber >= config.roundCount
+        }()
+
         let result = RoundResult(
             roundNumber: roundNumber,
             scores: scoreList,
             highlightPlayerId: highlightId,
-            voteCounts: voteCounts
+            voteCounts: voteCounts,
+            isFinal: isFinalRound
         )
         lastRoundResult = result
         currentRound = nil
         sender.broadcast(.roundResult(result: result))
 
-        guard let config, players.count >= 2, roundNumber < config.roundCount else {
+        guard !isFinalRound else {
             endGame()
             return
         }

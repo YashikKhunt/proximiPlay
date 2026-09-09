@@ -201,9 +201,17 @@ private struct RoundFlowModifier<Payload, Trigger: Equatable>: ViewModifier {
             }
             .onChange(of: engine.lastRoundResult?.roundNumber, initial: true) { _, newRoundNumber in
                 guard newRoundNumber != nil, let result = engine.lastRoundResult else { return }
+                // `result.isFinal` is host-authoritative and arrives *in*
+                // the round result, so it is already correct on the first
+                // render. `engine.finalScores != nil` is kept only as a
+                // belt-and-braces fallback for a result encoded before the
+                // flag existed; it must never be the primary signal, since
+                // on a joiner it is still `nil` at this point — `.gameEnd`
+                // is a separate message that lands a turn later. See
+                // `RoundResult.isFinal`.
                 guard let presented = flow.presentReveal(
                     result: result,
-                    isFinal: engine.finalScores != nil
+                    isFinal: result.isFinal || engine.finalScores != nil
                 ) else { return }
                 onReveal(presented)
             }

@@ -115,6 +115,62 @@ struct RoundFlowTests {
         #expect(secondReveal?.baselineScores[alice] == 100)
     }
 
+    /// The user-visible half of the joiner-results regression: a reveal
+    /// presented as final must still be on screen after the auto-advance
+    /// window a non-final reveal would have been dismissed in. When the
+    /// final round was mistakenly presented as non-final, this is the beat
+    /// where the joiner's results vanished and the waiting view took over
+    /// for the rest of the game.
+    @Test func finalRevealSurvivesTheAutoAdvanceWindow() async throws {
+        let flow = RoundFlow<String>()
+        flow.begin("last-round")
+
+        #expect(flow.presentReveal(result: result(round: 1), isFinal: true) != nil)
+
+        // Comfortably past the 2.5s a non-final reveal is dismissed after.
+        try await Task.sleep(for: .seconds(3))
+
+        #expect(flow.reveal != nil, "A final reveal must never auto-dismiss — there is no next round to advance to")
+        #expect(flow.reveal?.isFinal == true)
+    }
+
+    /// The joiner's exact message ordering, in one assertion.
+    ///
+    /// `.roundResult` and `.gameEnd` reach a joiner as two separate
+    /// messages, each dispatched in its own main-actor `Task`. At the moment
+    /// the round-result observer runs — which is when the reveal is built —
+    /// `.gameEnd` has not been applied yet, so `finalScores` is still `nil`.
+    /// `result.isFinal` is therefore the *only* signal available in-band at
+    /// render time, which is precisely why it must live on `RoundResult`.
+    @Test func joinerKnowsARoundWasFinalBeforeGameEndArrives() {
+        let engine = GameEngine(sender: MockMessageSender())
+        let players = [
+            Player(displayName: "Ari", color: .blue),
+            Player(displayName: "Bo", color: .red)
+        ]
+        let scores = players.map { PlayerScore(playerId: $0.id, displayName: $0.displayName, score: 10) }
+
+        engine.applyFollowerMessage(.gameStart(mode: .quickTrivia, config: GameConfig(roundCount: 1, timePerRound: 20)))
+        engine.applyFollowerMessage(.roundStart(data: .trivia(question: "Q", options: ["A", "B", "C", "D"], correctIndex: 0), round: 1))
+
+        // Turn one: the final round's result lands, alone.
+        let final = RoundResult(roundNumber: 1, scores: scores, isFinal: true)
+        engine.applyFollowerMessage(.roundResult(result: final))
+
+        #expect(
+            engine.finalScores == nil,
+            "Precondition: .gameEnd has not arrived yet — deriving isFinal from finalScores here is what broke joiners"
+        )
+        #expect(
+            engine.lastRoundResult?.isFinal == true,
+            "The flag must already be readable from the result itself"
+        )
+
+        // Turn two: .gameEnd finally lands, a whole main-actor turn later.
+        engine.applyFollowerMessage(.gameEnd(scores: scores))
+        #expect(engine.finalScores != nil)
+    }
+
     @Test func finalFlagIsCarriedThrough() {
         let flow = RoundFlow<String>()
         flow.begin("last")

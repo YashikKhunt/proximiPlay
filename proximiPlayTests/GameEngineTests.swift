@@ -153,6 +153,146 @@ struct GameEngineTriviaSimulationTests {
         #expect(gameEndCount == 1)
     }
 
+    // MARK: - `.roundResult.isFinal` (joiner results regression)
+
+    /// The final round's result must announce itself as final *in the
+    /// message*, not leave the client to infer it from `.gameEnd` arriving.
+    ///
+    /// Regression: `isFinal` used to be derived view-side as
+    /// `engine.finalScores != nil`. That is true on the host, where
+    /// `finishRound()` and `endGame()` run in one synchronous turn that
+    /// Observation coalesces — but a joiner receives `.roundResult` and
+    /// `.gameEnd` as two separate messages in two separate main-actor
+    /// tasks, so its round-result observer ran a full turn before
+    /// `finalScores` existed. Joiners rendered the last round as a
+    /// non-final reveal ("Next round starting…"), auto-advanced it after
+    /// 2.5s, and were stranded on the waiting view while the host sat on
+    /// the results screen.
+    @Test func onlyTheFinalRoundResultIsFlaggedFinal() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(3)
+        let config = GameConfig(roundCount: 3, timePerRound: 20)
+
+        engine.startGame(mode: .quickTrivia, roster: players, config: config)
+
+        for round in 1...3 {
+            guard case .trivia(_, _, let correctIndex)? = roundStartData(sender.sentMessages, round: round) else {
+                Issue.record("Missing .roundStart for round \(round)")
+                continue
+            }
+            for player in players {
+                engine.submitInput(
+                    playerId: player.id,
+                    input: .triviaAnswer(index: correctIndex, timestamp: Date())
+                )
+            }
+        }
+
+        #expect(roundResult(sender.sentMessages, round: 1)?.isFinal == false)
+        #expect(roundResult(sender.sentMessages, round: 2)?.isFinal == false)
+        #expect(
+            roundResult(sender.sentMessages, round: 3)?.isFinal == true,
+            "The last round's result must carry isFinal — a joiner has no other in-band way to know"
+        )
+    }
+
+    /// A one-round game's only result is also its final one.
+    @Test func singleRoundGameFlagsItsOnlyResultAsFinal() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(2)
+
+        engine.startGame(
+            mode: .quickTrivia,
+            roster: players,
+            config: GameConfig(roundCount: 1, timePerRound: 20)
+        )
+
+        guard case .trivia(_, _, let correctIndex)? = roundStartData(sender.sentMessages, round: 1) else {
+            Issue.record("Missing .roundStart for round 1")
+            return
+        }
+        for player in players {
+            engine.submitInput(
+                playerId: player.id,
+                input: .triviaAnswer(index: correctIndex, timestamp: Date())
+            )
+        }
+
+        #expect(roundResult(sender.sentMessages, round: 1)?.isFinal == true)
+    }
+
+    /// The game can also end early — dropping below two players ends it
+    /// mid-way through the configured round count. That result is final
+    /// too, and joiners depend on the flag exactly as much there.
+    @Test func resultIsFlaggedFinalWhenTheGameEndsEarlyOnPlayerLoss() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(3)
+
+        engine.startGame(
+            mode: .quickTrivia,
+            roster: players,
+            config: GameConfig(roundCount: 5, timePerRound: 20)
+        )
+
+        // Two of the three leave, so the round in progress is the last one
+        // that can be played even though roundCount is 5.
+        engine.playerDisconnected(players[1].id)
+        engine.playerDisconnected(players[2].id)
+
+        guard let last = sender.sentMessages.compactMap({ message -> RoundResult? in
+            if case .roundResult(let result) = message { return result }
+            return nil
+        }).last else {
+            Issue.record("Game never broadcast a .roundResult")
+            return
+        }
+
+        #expect(last.isFinal == true, "An early end on player loss is still an end")
+        #expect(finalScores(sender.sentMessages) != nil)
+    }
+
+    /// `isFinal` and the decision to call `endGame()` are computed from one
+    /// value in `finishRound()`. This pins them together: exactly one result
+    /// is flagged final, and it is the one immediately followed by
+    /// `.gameEnd` on the wire.
+    @Test func theFinalFlaggedResultIsTheOneFollowedByGameEnd() {
+        let sender = MockMessageSender()
+        let engine = GameEngine(sender: sender)
+        let players = makePlayers(2)
+        let config = GameConfig(roundCount: 2, timePerRound: 20)
+
+        engine.startGame(mode: .quickTrivia, roster: players, config: config)
+
+        for round in 1...2 {
+            guard case .trivia(_, _, let correctIndex)? = roundStartData(sender.sentMessages, round: round) else {
+                Issue.record("Missing .roundStart for round \(round)")
+                continue
+            }
+            for player in players {
+                engine.submitInput(
+                    playerId: player.id,
+                    input: .triviaAnswer(index: correctIndex, timestamp: Date())
+                )
+            }
+        }
+
+        let messages = sender.sentMessages
+        var flaggedFinalCount = 0
+        for (index, message) in messages.enumerated() {
+            guard case .roundResult(let result) = message, result.isFinal else { continue }
+            flaggedFinalCount += 1
+
+            let followedByGameEnd = messages[(index + 1)...].contains {
+                if case .gameEnd = $0 { return true } else { return false }
+            }
+            #expect(followedByGameEnd, "A result flagged final must be followed by .gameEnd")
+        }
+        #expect(flaggedFinalCount == 1, "Exactly one result per game is the final one")
+    }
+
     @Test func startGameIgnoredWithFewerThanTwoPlayers() {
         let sender = MockMessageSender()
         let engine = GameEngine(sender: sender)
