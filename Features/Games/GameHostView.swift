@@ -31,6 +31,15 @@ struct GameHostView: View {
     /// instead of racing an earlier dismiss against the newer name.
     @State private var departureDismissTask: Task<Void, Never>?
 
+    /// The player the host is being asked to confirm removing mid-game.
+    @State private var playerPendingRemoval: Player?
+
+    /// Everyone in the roster except the host — the only people the host can
+    /// remove. Mirrors `LobbyView.otherPlayers`.
+    private var removablePlayers: [Player] {
+        sessionManager.roster.players.filter { $0.id != sessionManager.myPlayer.id }
+    }
+
     private var sessionManager: GameSessionManager { appState.gameSessionManager }
 
     /// Same trigger as `LobbyView.reconnectingBanner` — surfaced here too
@@ -75,6 +84,36 @@ struct GameHostView: View {
         }
         .task {
             startEngineIfNeeded()
+        }
+        // Host-only mid-game removal (Guideline 1.2). Applied on this shared
+        // container rather than per mode view, so all four modes get it from
+        // one definition and none can be missed — Speed Draw is the reason
+        // this exists mid-game at all, since its strokes are live UGC
+        // reaching every device, but a nickname is just as visible in the
+        // others.
+        .toolbar {
+            if sessionManager.isHost && !removablePlayers.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Section("Remove a player") {
+                            ForEach(removablePlayers) { player in
+                                Button(role: .destructive) {
+                                    playerPendingRemoval = player
+                                } label: {
+                                    Label(player.displayName, systemImage: "person.fill.xmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Manage Players", systemImage: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("Manage players")
+                    .accessibilityHint("Remove a player from this game")
+                }
+            }
+        }
+        .removePlayerConfirmation(for: $playerPendingRemoval) { player in
+            sessionManager.removePlayer(player)
         }
         .statusBannerOverlay([reconnectingBanner, departureBanner].compactMap { $0 })
         // The roster shrinking is the only on-screen trace of

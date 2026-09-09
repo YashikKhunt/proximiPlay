@@ -27,6 +27,144 @@ private func lastRoundResult(_ sender: MockMessageSender) -> RoundResult? {
     }.first
 }
 
+// MARK: - Host removal (Guideline 1.2)
+
+/// Removing a player is host-authoritative and, because Multipeer cannot
+/// force-disconnect a peer, only partly enforced by the message itself.
+/// These pin all three enforcement steps and the origin gate.
+@MainActor
+struct HostRemovePlayerTests {
+
+    /// Builds a host with one connected joiner already in the roster.
+    private func makeHostWithJoiner() -> (GameSessionManager, Player, MCPeerID) {
+        let sut = GameSessionManager()
+        sut.isHost = true
+        let host = Player(displayName: "Ari", color: .blue, isHost: true)
+        sut.myPlayer = host
+        sut.roster.setHost(host)
+
+        let peer = MCPeerID(displayName: "Bo")
+        let joiner = sut.roster.hostPlayerJoined(peer: peer, displayName: "Bo")
+        return (sut, joiner, peer)
+    }
+
+    @Test func removingAPlayerDropsThemFromTheRoster() {
+        let (sut, joiner, _) = makeHostWithJoiner()
+        #expect(sut.roster.players.count == 2)
+
+        #expect(sut.removePlayer(joiner) == true)
+
+        #expect(sut.roster.players.count == 1)
+        #expect(!sut.roster.players.contains { $0.id == joiner.id })
+    }
+
+    /// The removal must survive a client that ignores `.removedByHost` and
+    /// stays connected: with the peer→player mapping gone, anything they
+    /// send fails validation.
+    @Test func aRemovedPlayersInputNoLongerValidates() {
+        let (sut, joiner, peer) = makeHostWithJoiner()
+        #expect(sut.roster.isValid(playerId: joiner.id, from: peer) == true)
+
+        sut.removePlayer(joiner)
+
+        #expect(
+            sut.roster.isValid(playerId: joiner.id, from: peer) == false,
+            "A removed player must not be able to keep submitting input"
+        )
+    }
+
+    /// Without this the host keeps advertising and the removed device
+    /// re-invites itself back within seconds.
+    @Test func aRemovedPeerIsBlockedForTheRestOfTheSession() {
+        let (sut, joiner, peer) = makeHostWithJoiner()
+        #expect(sut.isBlocked(peer) == false)
+
+        sut.removePlayer(joiner)
+
+        #expect(sut.isBlocked(peer) == true)
+    }
+
+    @Test func endingTheSessionClearsTheBlockList() {
+        let (sut, joiner, peer) = makeHostWithJoiner()
+        sut.removePlayer(joiner)
+        #expect(sut.isBlocked(peer) == true)
+
+        sut.stopSession()
+
+        #expect(
+            sut.isBlocked(peer) == false,
+            "A removal is scoped to one session — never a permanent ban"
+        )
+    }
+
+    @Test func theHostCannotRemoveItself() {
+        let (sut, _, _) = makeHostWithJoiner()
+        let host = sut.myPlayer
+
+        #expect(sut.removePlayer(host) == false)
+        #expect(sut.roster.players.contains { $0.id == host.id })
+    }
+
+    @Test func aJoinerCannotRemoveAnyone() {
+        let (sut, joiner, _) = makeHostWithJoiner()
+        sut.isHost = false
+
+        #expect(sut.removePlayer(joiner) == false)
+        #expect(sut.roster.players.count == 2)
+    }
+
+    @Test func removingSomeoneNotInTheRosterIsANoOp() {
+        let (sut, _, _) = makeHostWithJoiner()
+        let stranger = Player(displayName: "Nobody", color: .teal)
+
+        #expect(sut.removePlayer(stranger) == false)
+        #expect(sut.roster.players.count == 2)
+    }
+
+    // MARK: Origin discipline on the receiving side
+
+    @Test func removedByHostFromTheJoinedHostIsHonoured() {
+        let sut = GameSessionManager()
+        sut.isHost = false
+        let hostPeer = MCPeerID(displayName: "Host")
+        sut.hostPeerID = hostPeer
+
+        #expect(sut.removedByHostToken == 0)
+        sut.receive(.removedByHost, from: hostPeer)
+        #expect(sut.removedByHostToken == 1)
+    }
+
+    /// The attack this gate exists for: one joiner evicting another.
+    @Test func removedByHostFromAFellowJoinerIsIgnored() {
+        let sut = GameSessionManager()
+        sut.isHost = false
+        sut.hostPeerID = MCPeerID(displayName: "Host")
+
+        sut.receive(.removedByHost, from: MCPeerID(displayName: "Impostor"))
+
+        #expect(sut.removedByHostToken == 0)
+    }
+
+    @Test func removedByHostIsIgnoredOnTheHostItself() {
+        let sut = GameSessionManager()
+        sut.isHost = true
+        let somePeer = MCPeerID(displayName: "Joiner")
+        sut.hostPeerID = somePeer
+
+        sut.receive(.removedByHost, from: somePeer)
+
+        #expect(sut.removedByHostToken == 0, "A host can never be made to remove itself")
+    }
+
+    @Test func removedByHostSurvivesAnEncodeDecodeRoundTrip() throws {
+        let decoded = try GameMessage.decoded(from: GameMessage.removedByHost.encoded())
+        guard case .removedByHost = decoded else {
+            Issue.record("Expected .removedByHost, got \(decoded)")
+            return
+        }
+    }
+}
+
 // MARK: - (a) .lobbyReturn origin discipline
 
 /// `.lobbyReturn` is host-authoritative: it yanks every joiner out of the

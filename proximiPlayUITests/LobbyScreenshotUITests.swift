@@ -70,6 +70,27 @@ final class LobbyScreenshotUITests: XCTestCase {
         try capture(named: "lobby-host-with-players", into: directory)
     }
 
+    /// Captures the host's swipe-to-remove action revealed on a roster row
+    /// (Guideline 1.2). Uses the same `-demo-roster` seed as the frame above.
+    @MainActor
+    func testCaptureLobbyRemoveActionFrame() throws {
+        let directory = try screenshotDirectory()
+        let app = XCUIApplication()
+        app.launchArguments += ["-demo-roster"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["Start Game"].waitForExistence(timeout: 5))
+        app.buttons["Start Game"].tap()
+        XCTAssertTrue(app.navigationBars["Game Lobby"].waitForExistence(timeout: 5))
+
+        let row = app.cells.containing(.staticText, identifier: "Bo").element(boundBy: 0)
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.swipeLeft()
+        Thread.sleep(forTimeInterval: 1.0)
+
+        try capture(named: "lobby-remove-action", into: directory)
+    }
+
     /// Captures `JoinView`'s "still searching" state — no host is actually
     /// nearby in the test environment, so `connectionState` stays `.browsing`
     /// with an empty `discoveredHosts`, which is exactly the frame this is

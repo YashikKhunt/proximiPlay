@@ -57,6 +57,27 @@ nonisolated enum GameMessage: Codable, Sendable {
     /// joiner cannot yank everyone out of a game and the host can never be
     /// made to follow its own message.
     case lobbyReturn
+    /// Host → **one** peer: "you have been removed from this game."
+    ///
+    /// Sent point-to-point (never broadcast) by
+    /// `GameSessionManager.removePlayer(_:)`. The recipient tears down its
+    /// own session and returns to the root of navigation — see
+    /// `ContentView`'s `removedByHostToken` observer.
+    ///
+    /// **This message is a request, not an eviction.** Multipeer exposes no
+    /// way to force-disconnect a single peer: `MCSession.disconnect()` drops
+    /// *your own* session, and there is no `disconnect(peer:)`. A kick is
+    /// therefore cooperative, and a modified client could simply ignore it.
+    /// That is why `removePlayer(_:)` does not rely on this message alone —
+    /// it also drops the peer from the roster (so their input fails
+    /// `PlayerRoster` validation) and blocks their `MCPeerID` for the rest
+    /// of the session (so they cannot immediately re-invite themselves back
+    /// into a host that is still advertising).
+    ///
+    /// Host-authoritative like `.gameStart`/`.lobbyReturn`: honoured only
+    /// when `GameSessionManager.isFromHost` vouches for the sender, so one
+    /// joiner cannot evict another and the host can never remove itself.
+    case removedByHost
 
     // MARK: - Serialization Helpers
 

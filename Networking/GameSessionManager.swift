@@ -129,6 +129,29 @@ final class GameSessionManager: NSObject, Sendable {
     /// `false` there), so the host can't follow its own broadcast.
     @MainActor var lobbyReturnToken: Int = 0
 
+    /// Monotonically increments on every `.removedByHost` accepted from the
+    /// host — the joiner-side signal that the host removed this device from
+    /// the game. A token rather than a `Bool` for the same reason as
+    /// `lobbyReturnToken`. Never incremented on the host (`isFromHost` is
+    /// always `false` there), so a host can never remove itself, and a
+    /// fellow joiner's forged message is dropped before it gets here.
+    @MainActor var removedByHostToken: Int = 0
+
+    /// Peers the host removed, blocked for the remainder of this session.
+    ///
+    /// Load-bearing, not bookkeeping. `.removedByHost` only *asks* a peer to
+    /// leave — Multipeer has no force-disconnect — and the host keeps
+    /// advertising after a removal, so without this the removed device (or a
+    /// modified client that ignored the message outright) re-invites itself
+    /// straight back. Checked in the advertiser's invitation callback, which
+    /// declines blocked peers without ever surfacing a prompt to the host.
+    ///
+    /// Session-scoped by design: cleared by `stopSession()`, so a removal is
+    /// never a permanent ban that outlives the game it happened in. Keyed by
+    /// `MCPeerID`, which is cached per install (see `PlayerNickname`), so it
+    /// survives the removed player force-quitting and reopening the app.
+    @ObservationIgnored @MainActor private var blockedPeers: Set<MCPeerID> = []
+
     /// Nicknames peers asked for in their invitation context, held from the
     /// advertiser callback until the matching `.connected` state change
     /// creates their roster entry. Sanitized on the way *in* to the roster
@@ -382,6 +405,8 @@ final class GameSessionManager: NSObject, Sendable {
         lastGameStart = nil
         lastGameStartToken = 0
         lobbyReturnToken = 0
+        removedByHostToken = 0
+        blockedPeers = []
 
         Self.logger.info("Session stopped and state reset")
     }
@@ -559,6 +584,11 @@ final class GameSessionManager: NSObject, Sendable {
             Self.logger.info("Host returned the session to the lobby")
         }
 
+        if case .removedByHost = message, isFromHost(peerID) {
+            removedByHostToken += 1
+            Self.logger.info("Host removed this device from the game")
+        }
+
         onMessageReceived?(message, peerID)
     }
 }
@@ -705,6 +735,14 @@ extension GameSessionManager: MCNearbyServiceAdvertiserDelegate {
         Self.logger.info("Received invitation from: \(peerID.displayName)")
         let requestedNickname = Self.nickname(fromInvitationContext: context)
         Task { @MainActor in
+            // A peer the host already removed never gets a second prompt —
+            // declined outright, so a removal cannot be undone by the removed
+            // player simply tapping Join again (see `removePlayer(_:)`).
+            guard !self.blockedPeers.contains(peerID) else {
+                Self.logger.info("Declined invitation from a peer the host removed")
+                invitationHandler(false, nil)
+                return
+            }
             // Enforce the player cap (host occupies one of maxPlayers slots)
             // and hold at most one pending request at a time. Everything else
             // waits for an explicit host decision — never auto-accept.
@@ -752,6 +790,78 @@ extension GameSessionManager: MCNearbyServiceAdvertiserDelegate {
         pendingInvitation = nil
         invitation.respond(accept, accept ? session : nil)
         Self.logger.info("Host \(accept ? "accepted" : "declined") join request from \(invitation.peerName)")
+    }
+
+    // MARK: - Host: Removing a Player
+
+    /// Removes `player` from the session. Host-only; a no-op for anyone else
+    /// or for the host's own entry.
+    ///
+    /// App Store Guideline 1.2 expects a way to remove an abusive user, and
+    /// this app carries user-generated content on two surfaces that reach
+    /// every device: nicknames (also baked into the shareable result card)
+    /// and live Speed Draw strokes.
+    ///
+    /// Three things happen, and all three are needed:
+    ///
+    /// 1. `.removedByHost` is sent point-to-point so the target tears down
+    ///    its own session and says why. Multipeer cannot force-disconnect a
+    ///    peer, so this is a request the target device honours — a modified
+    ///    client could ignore it, which is why it is not the only step.
+    /// 2. The peer is dropped from the roster. Their `playerId` no longer
+    ///    maps to their `MCPeerID`, so any further `.playerInput` they send
+    ///    fails `PlayerRoster.isValid(playerId:for:)` and is discarded — the
+    ///    removal holds even against a client that stayed connected.
+    /// 3. Their `MCPeerID` is blocked for the rest of the session, so the
+    ///    still-advertising host auto-declines their re-invitation instead
+    ///    of prompting the host to re-admit the person they just removed.
+    ///
+    /// The updated roster is broadcast last, so every remaining device
+    /// re-renders without the removed player.
+    ///
+    /// - Returns: `true` when the player was removed.
+    @discardableResult
+    @MainActor
+    func removePlayer(_ player: Player) -> Bool {
+        guard isHost else {
+            Self.logger.warning("removePlayer(_:) ignored — not the host")
+            return false
+        }
+        guard player.id != myPlayer.id else {
+            Self.logger.warning("removePlayer(_:) ignored — the host cannot remove itself")
+            return false
+        }
+        guard let peerID = roster.peerID(for: player.id) else {
+            Self.logger.warning("removePlayer(_:) ignored — no peer mapped to that player")
+            return false
+        }
+
+        // Tell them first, while the session still carries the message.
+        send(.removedByHost, to: [peerID])
+
+        blockedPeers.insert(peerID)
+        requestedNicknames.removeValue(forKey: peerID)
+        roster.hostPlayerLeft(peer: peerID)
+        broadcastLobbyUpdate()
+
+        // Tell game state now rather than waiting for the `.notConnected`
+        // state change: a mid-game removal must not leave the engine holding
+        // the round open for input from someone who is no longer playing, and
+        // a client that ignores `.removedByHost` never produces that state
+        // change at all. Same callback a real peer drop uses, so the engine
+        // path is identical either way — and it is idempotent, so the
+        // disconnect that (usually) follows is harmless.
+        onPlayerLeft?(player.id)
+
+        Self.logger.info("Host removed a player and blocked their peer for this session")
+        return true
+    }
+
+    /// Whether `peer` was removed by the host earlier in this session.
+    /// Exposed for tests and for the advertiser's invitation gate.
+    @MainActor
+    func isBlocked(_ peer: MCPeerID) -> Bool {
+        blockedPeers.contains(peer)
     }
 
     nonisolated func advertiser(

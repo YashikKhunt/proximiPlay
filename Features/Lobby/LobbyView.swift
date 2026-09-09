@@ -15,6 +15,11 @@ struct LobbyView: View {
     /// `startGame()` doc comment for why). Defaults to the first mode.
     @State private var selectedMode: GameMode = .quickTrivia
 
+    /// The player the host is being asked to confirm removing. Removal is
+    /// destructive and irreversible for the session, so it never happens on
+    /// a single swipe.
+    @State private var playerPendingRemoval: Player?
+
     private var sessionManager: GameSessionManager { appState.gameSessionManager }
 
     /// Every synced roster player except the local device — the "You"
@@ -94,6 +99,9 @@ struct LobbyView: View {
             }
         } message: { invitation in
             Text("\(invitation.peerName) wants to join your game.")
+        }
+        .removePlayerConfirmation(for: $playerPendingRemoval) { player in
+            sessionManager.removePlayer(player)
         }
         .task {
             appState.connectionMonitor.startMonitoring(sessionManager: sessionManager)
@@ -194,6 +202,19 @@ struct LobbyView: View {
                         peerHealth: appState.peerHealth(for: player)
                     )
                     .transition(playerRowTransition)
+                    // Host-only: Guideline 1.2's "remove an abusive user".
+                    // `allowsFullSwipe: false` so removal always takes a
+                    // deliberate tap on the revealed button, never a fast
+                    // swipe past a row.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if sessionManager.isHost {
+                            Button(role: .destructive) {
+                                playerPendingRemoval = player
+                            } label: {
+                                Label("Remove", systemImage: "person.fill.xmark")
+                            }
+                        }
+                    }
                 }
             }
         } header: {

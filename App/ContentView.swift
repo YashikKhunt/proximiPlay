@@ -46,6 +46,34 @@ struct ContentView: View {
             router.popToRoot()
             router.navigate(to: .lobby)
         }
+        // Joiner-side response to being removed by the host
+        // (`.removedByHost`). Handled here at the navigation root for the
+        // same reason as `lobbyReturnToken` directly above: a removal can
+        // land while this device is on the lobby, any mode view, or the
+        // results screen, and only a root-level observer covers all of them
+        // without every screen having to remember to opt in.
+        //
+        // The token is incremented solely by
+        // `GameSessionManager.receive(_:from:)` behind its `isFromHost`
+        // gate, so this can never fire on the host or from a fellow
+        // joiner's forged message.
+        .alert(
+            "Removed From Game",
+            isPresented: Binding(
+                get: { appState.gameSessionManager.removedByHostToken > 0 },
+                set: { _ in }
+            )
+        ) {
+            Button("OK") {
+                // Order matters: tear the session down *before* navigating,
+                // so the lobby's `.onDisappear` sees an idle state and
+                // doesn't try to leave a session that is already gone.
+                appState.resetAfterRemoval()
+                router.popToRoot()
+            }
+        } message: {
+            Text("The host removed you from this game.")
+        }
         // Drive the writable `motionReduceMotion` mirror from SwiftUI's real
         // key. `ReduceMotionKey.defaultValue` reads
         // `UIAccessibility.isReduceMotionEnabled` directly, which SwiftUI does

@@ -259,14 +259,15 @@ final class AppState {
                 }
                 engine.applyFollowerMessage(message)
 
-            case .lobbyUpdate, .identityAssignment, .lobbyReturn:
+            case .lobbyUpdate, .identityAssignment, .lobbyReturn, .removedByHost:
                 // Session-level, not game-level: mirrored into
                 // `GameSessionManager` state (roster, `myPlayer`,
-                // `lobbyReturnToken`) inside its own `receive(_:from:)`,
-                // behind the same `isFromHost` gate. `.lobbyReturn`'s
-                // navigation + engine teardown happen together in
-                // `ResultsView` so joiners never render a half-cleared
-                // game.
+                // `lobbyReturnToken`, `removedByHostToken`) inside its own
+                // `receive(_:from:)`, behind the same `isFromHost` gate.
+                // `.lobbyReturn`'s navigation + engine teardown happen
+                // together in `ResultsView` so joiners never render a
+                // half-cleared game; `.removedByHost`'s happen together in
+                // `ContentView`'s root-level observer, for the same reason.
                 break
             }
         }
@@ -370,6 +371,21 @@ final class AppState {
     /// Clears game and session state after `hostLeft` fires, returning the
     /// app to a clean idle state so navigation can reset to the root.
     func resetAfterHostLeft() {
+        gameEngine.reset()
+        currentGameState = .idle
+        gameSessionManager.stopSession()
+    }
+
+    /// Clears game and session state after the host removed this device,
+    /// returning the app to a clean idle state so navigation can reset to
+    /// the root.
+    ///
+    /// Identical in effect to `resetAfterHostLeft()` — the session is gone
+    /// either way — but kept separate because the two are reached from
+    /// different signals and read very differently to the player. Tearing
+    /// the session down here is also what makes the removal stick from this
+    /// side: the device stops browsing and cannot silently reconnect.
+    func resetAfterRemoval() {
         gameEngine.reset()
         currentGameState = .idle
         gameSessionManager.stopSession()
